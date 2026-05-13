@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: mart_net_revenue_daily
+    description: >
+      Daily net revenue per day. Parameterised from client_config so
+      business logic (B2B exclusions, shipping inclusion) is applied
+      correctly per client. This is the primary table Agent A queries
+      for margin threshold checks.
+    columns:
+      - name: order_date
+        description: "Date of orders"
+        tests:
+          - unique
+          - not_null
+      - name: order_count
+        description: "Number of non-cancelled, non-voided orders on this date"
+        tests:
+          - not_null
+      - name: gross_revenue
+        description: "Sum of line item prices before discounts"
+        tests:
+          - not_null
+      - name: net_revenue
+        description: "Gross revenue minus discounts. Does not include refunds yet."
+        tests:
+          - not_null
+      - name: data_completeness_pct
+        description: >
+          Percentage of orders from sources with dedicated connectors.
+          Used by Agent A to assess signal quality before firing alerts.
+        tests:
+          - not_null

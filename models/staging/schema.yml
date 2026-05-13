@@ -1,0 +1,105 @@
+version: 2
+
+models:
+  - name: stg_shopify_order_source_attribution
+    description: >
+      Classifies every Shopify order by its true originating system
+      using source_name, app_id, and tags fields. Provides attribution
+      confidence score and a flag indicating whether the source system
+      has a dedicated Profit Sentinel connector.
+    columns:
+      - name: order_id
+        description: "Unique Shopify order ID"
+        tests:
+          - unique
+          - not_null
+      - name: order_source_system
+        description: "Classified source system label"
+        tests:
+          - not_null
+      - name: attribution_confidence
+        description: "Confidence level of the classification: high, medium, or low"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['high', 'medium', 'low']
+      - name: has_dedicated_connector
+        description: "True if this source system has an active Profit Sentinel connector"
+        tests:
+          - not_null
+
+  - name: stg_shopify_orders
+    description: >
+      Cleaned Shopify orders with correct data types. Excludes cancelled
+      and voided orders. One row per order.
+    columns:
+      - name: order_id
+        description: "Unique Shopify order ID"
+        tests:
+          - unique
+          - not_null
+      - name: order_date
+        description: "Date the order was placed"
+        tests:
+          - not_null
+      - name: gross_revenue
+        description: >
+          Total line item price before discounts. Source: total_line_items_price.
+          Does NOT include shipping or tax.
+        tests:
+          - not_null
+      - name: total_discounts
+        description: "Total discount amount applied to the order"
+        tests:
+          - not_null
+      - name: financial_status
+        description: "Shopify payment status of the order"
+        tests:
+          - not_null
+      - name: is_cancelled
+        description: "True if the order was cancelled"
+        tests:
+          - not_null
+
+  - name: stg_shopify_refunds
+    description: >
+      Cleaned Shopify refunds. One row per refund event.
+      Note: this table records the refund event, not line item amounts.
+      Line item refund amounts come from shopify_order_refunds joined
+      with refund line items.
+    columns:
+      - name: refund_id
+        description: "Unique Shopify refund ID"
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: "The order this refund belongs to"
+        tests:
+          - not_null
+      - name: refund_date
+        description: "Date the refund was processed"
+        tests:
+          - not_null
+
+  - name: stg_shopify_net_sales_validation
+    description: >
+      Replicates Shopify's own Net Sales formula applied to raw transaction data.
+      Used during onboarding to validate that our calculations match the
+      Shopify dashboard within 0.5% tolerance.
+      Formula: Net Sales = Gross Sales - Discounts (excludes tax and shipping).
+    columns:
+      - name: order_date
+        description: "Date of orders in this row"
+        tests:
+          - unique
+          - not_null
+      - name: gross_sales
+        description: "Sum of total_line_items_price for all orders on this date"
+        tests:
+          - not_null
+      - name: net_sales_before_returns
+        description: "Gross sales minus discounts. Matches Shopify Net Sales metric."
+        tests:
+          - not_null
