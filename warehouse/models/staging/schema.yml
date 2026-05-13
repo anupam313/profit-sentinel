@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_shopify_order_source_attribution
+    description: "Classifies every order by originating system"
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: order_source_system
+        tests:
+          - not_null
+      - name: attribution_confidence
+        tests:
+          - not_null
+      - name: has_dedicated_connector
+        tests:
+          - not_null
+
+  - name: stg_shopify_orders
+    description: "Cleaned Shopify orders. Excludes cancelled and voided."
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: order_date
+        tests:
+          - not_null
+      - name: gross_revenue
+        tests:
+          - not_null
+      - name: financial_status
+        tests:
+          - not_null
+
+  - name: stg_shopify_refunds
+    description: "Cleaned Shopify refunds. One row per refund."
+    columns:
+      - name: refund_id
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        tests:
+          - not_null
+      - name: refund_date
+        tests:
+          - not_null
+
+  - name: stg_shopify_net_sales_validation
+    description: "Replicates Shopify Net Sales formula for validation"
+    columns:
+      - name: order_date
+        tests:
+          - unique
+          - not_null
+      - name: gross_sales
+        tests:
+          - not_null
