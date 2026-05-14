@@ -347,6 +347,8 @@ Airbyte pulls from Shopify API every 6 hours using incremental sync. Creates/upd
 ### Step 2: Schema Discovery
 `connectors/schema_discovery.py` runs post-sync. Queries `information_schema.columns` for the raw table. Compares to `source_schema_registry`. Detects new columns, type changes, removed columns. Updates registry. Writes changes to `schema_versions`.
 
+**Watermark column:** Airbyte Destinations V2 renamed `_airbyte_emitted_at` to `_airbyte_extracted_at`. `python_transformer.py` checks V2 name first, V1 as fallback.
+
 ```python
 def discover_and_update_schema(client_id, table_name, conn):
     # Read actual schema from information_schema
@@ -388,6 +390,8 @@ def infer_target_type(data_type):
 
 ### Step 4: Python Transformer
 `connectors/python_transformer.py` reads the registry and generates a dynamic SELECT statement applying the correct transformation per column. Writes to staging tables in the client schema. No hardcoded casting logic anywhere.
+
+**Incremental load pattern:** on first run, creates staging table and does full load. On subsequent runs, finds `MAX(_airbyte_extracted_at)` in staging table as watermark and inserts only rows newer than watermark. Never drops staging table after first load. If watermark column absent, aborts with explicit error — no silent full refresh fallback.
 
 ```python
 def transform_table(client_id, table_name, conn):

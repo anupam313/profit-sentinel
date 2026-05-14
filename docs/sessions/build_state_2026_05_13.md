@@ -169,18 +169,63 @@ Existing files (do not modify unless noted):
 
 ---
 
-## Step 3 Specification (next session)
+## STEP 3 — Connect remaining sources via Airbyte
+Status: Not started
 
-Connect Meta Ads, Klaviyo, Gorgias via Airbyte into 
-client_azure_co schema. Run schema_discovery.py against 
-each new table set. Run python_transformer.py against 
-each. Verify staging tables.
+Sub-steps:
 
-Also: design GA4, Sentry, TikTok table schemas manually 
-and create those tables in client_azure_co.
+3a. Connect Meta Ads via Airbyte Cloud UI
+    → destination schema: client_azure_co
+    → trigger first sync
+    → confirm tables land in client_azure_co
 
-See docs/technical_architecture.md Section 10 Step 3 
-for the full specification.
+3b. Connect Klaviyo via Airbyte Cloud UI
+    → destination schema: client_azure_co
+    → trigger first sync
+    → confirm tables land in client_azure_co
+
+3c. Connect Gorgias via Airbyte Cloud UI
+    → destination schema: client_azure_co
+    → trigger first sync
+    → confirm tables land in client_azure_co
+
+3d. Connect Loop Returns via Airbyte Cloud UI
+    → destination schema: client_azure_co
+    → trigger first sync
+    → confirm tables land in client_azure_co
+    → CONDITIONAL: only include in Phase 1 signal 
+      library if customer discovery confirms >5 of 
+      first 10 interviewed brands use Loop Returns.
+      If condition not met, tables stay in schema 
+      but agents do not activate Loop signals.
+
+3e. Design GA4 table schema manually
+    → tables: ga4_sessions_daily, ga4_funnel_daily
+    → create in client_azure_co schema
+    → custom Python connector built in Step 5
+
+3f. Design Sentry table schema manually
+    → table: sentry_errors_daily
+    → create in client_azure_co schema
+    → custom Python connector built in Step 5
+
+3g. Design TikTok table schema manually
+    → table: tiktok_ad_performance
+    → create in client_azure_co schema
+    → TikTok Marketing API connector built in Step 5
+
+3h. Run schema_discovery.py against each new table
+    → one run per table
+    → confirm source_schema_registry populated 
+      for all new tables
+
+3i. Run python_transformer.py against each new table
+    → confirm stg_{table_name} created in 
+      client_azure_co for all new tables
+
+Step 3 is complete when all source tables have 
+corresponding staging tables and source_schema_registry 
+has entries for all columns across all sources.
 
 ---
 
