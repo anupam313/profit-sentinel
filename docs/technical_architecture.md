@@ -644,6 +644,70 @@ This 6-13 day lag between Gorgias sentiment and return spike is the core causal 
 | Sentry | Custom Python connector | `client_{brand_name}` | Every hour |
 | TikTok | TikTok Marketing API | `client_{brand_name}` | Every 6 hours |
 
+### Meta Ads API — Breaking Changes (May 2026)
+
+**Change 1 — Attribution Windows Deprecated (January 12, 2026)**
+7-day view (7d_view) and 28-day view (28d_view) attribution windows permanently removed from Ads Insights API. Deprecated windows return empty data silently — no error raised. New standard window is 7d_click + 1d_view only.
+
+Impact:
+- client_config.meta_attribution_window must default to '7d_click_1d_view' only. Remove 7d_view and 28d_view as valid values.
+- Agent A must treat January 12, 2026 as a hard-coded structural break date. Any ROAS drop detected within 30 days of this date must include a caveat in Evidence Stack Layer 2: "Note: Meta attribution window change on January 12, 2026 may account for part of this movement."
+- Alert 1 (True post-return ROAS by channel) and Alert 2 (Root cause of ROAS drop) both affected. Reported Meta conversions are structurally 15–40% lower post-January 12 vs pre-January 12 with identical campaign performance.
+
+**Change 2 — Historical Data Retention Limits (January 12, 2026)**
+- Unique-count fields (unique_actions, cost_per_unique_action_type): 13-month limit
+- Hourly breakdowns: 13-month limit
+- Frequency breakdowns: 6-month limit
+- MMM breakdowns: asynchronous jobs only, no real-time synchronous access
+
+Impact:
+- Supabase is the long-term store for Meta data. Do not rely on Meta API as source of historical truth beyond these windows. Airbyte incremental sync must persist data into Supabase immediately after each pull.
+- Evidence Stack Layer 3 historical precedent for Meta signals limited to 13 months lookback maximum.
+- Frequency-based creative fatigue signals limited to 6 months lookback in real client data.
+- Precision Profit Calendar (Moat 1) for Meta CPM seasonality patterns must be built within first 6 months of client onboarding before frequency data window closes.
+
+**Change 3 — 100+ Metrics Deprecated**
+- unique_actions: deprecated — use total actions
+- 10-second video view metric: retired January 26, 2026 — use ThruPlay or 2-second continuous views
+- Post/Page Reach, Video Impressions, Story Impressions: deprecated June 2026 — use Media Views and Media Viewers metrics
+
+Impact:
+- Do not include deprecated fields in manual Meta schema design or synthetic data.
+- schema_discovery.py will detect and handle future deprecations automatically via is_removed flag in source_schema_registry.
+
+**Change 4 — Advantage+ Replaces ASC/AAC Campaign Structure**
+- ASC and AAC campaign creation disabled from API v24.0 (October 2025) across all versions from May 2026
+- existing_customer_budget_percentage field permanently removed
+
+Impact:
+- Profit Sentinel reads campaigns, does not create them — no pipeline breakage
+- campaign_type field in meta_campaigns now reflects Advantage+ structures only
+- Remove existing_customer_budget_percentage from manual schema design and synthetic data
+- Synthetic data campaign labels must use Advantage+ campaign structures not ASC/AAC
+
+**Change 5 — Airbyte Connector Must Be v22.0+**
+Meta stopped allowing requests to Graph API versions older than v22.0 from September 9, 2025.
+
+Impact:
+- Before triggering first Meta sync in Airbyte, verify Facebook Marketing connector version is v22.0 or higher in the source configuration screen.
+- Airbyte Cloud should have auto-updated but must be manually confirmed before first sync.
+
+---
+
+**Synthetic Data Updates Required for Meta**
+
+When building the seed script in Step 5, apply these four changes to Meta synthetic data:
+
+1. Attribution windows: Generate rows using 7d_click and 1d_view only. For synthetic dates before January 12 2026, include a step-change drop of 25–35% in reported conversions on January 12 to simulate the real-world measurement break. Add attribution_setting column to flag pre/post break.
+
+2. Historical retention: Add stored_before_retention_limit boolean column to meta_ad_performance. Set true for rows older than 13 months from today. This flags data that would only exist in Supabase because Profit Sentinel stored it before the API retention window closed.
+
+3. Deprecated metrics: Remove unique_actions, 10-second video views, reach/impressions fields. Replace with: total actions, ThruPlay, Media Views equivalents.
+
+4. Campaign structure: Replace ASC/AAC campaign type labels with Advantage+ structures. Remove existing_customer_budget_percentage field entirely.
+
+---
+
 ### Destination Configuration
 - Host: `aws-1-us-east-1.pooler.supabase.com`
 - Port: 5432
