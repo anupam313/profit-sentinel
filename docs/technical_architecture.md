@@ -754,39 +754,44 @@ Create at slack.com for personal testing of onboarding flow and alert formats be
 ## 10. Build Sequence from Current State
 
 ```
-CURRENT STATE:
-✓ Supabase database exists (wrong schema structure)
-✓ Airbyte connected to Shopify dev store (wrong destination schema)
+CURRENT STATE (as of 2026-05-14):
+✓ Supabase database exists — client_azure_co schema
+✓ Airbyte connected to Shopify dev store → client_azure_co
 ✓ dbt Cloud connected to Supabase and GitHub
-✓ 5 dbt staging/mart models written and running
-✓ 1 row of validated data in mart_net_revenue_daily
-✗ Multi-tenancy not implemented
-✗ Schema registry not built
-✗ Dynamic transformer not built
-✗ Other sources not connected
+✓ Multi-tenancy implemented (public + client_azure_co)
+✓ Schema registry built (source_schema_registry, schema_versions)
+✓ Dynamic transformer built (schema_discovery.py, python_transformer.py)
+✓ Shopify: 47 raw tables + stg_shopify_orders (101 cols registered)
+✓ Klaviyo: 6 tables + staging (67 cols registered, ALL PASS)
+✓ Loop Returns: 3 placeholder tables + staging (35 cols registered, ALL PASS)
+✓ GA4: 6 tables + staging (87 cols registered, ALL PASS)
+✗ Meta Ads: not yet connected via Airbyte
+✗ Gorgias: not yet connected via Airbyte
+✗ Sentry: schema not yet designed
+✗ TikTok: schema not yet designed
 ✗ Synthetic data not seeded
+
+source_schema_registry totals: Shopify=101, Klaviyo=67,
+  Loop Returns=35, GA4=87 — Total: 290 columns registered
 
 IMMEDIATE NEXT STEPS:
 
-Step 1 (Multi-tenancy):
-  - Run Claude Code prompt to create 6 public application tables
-  - Create client_azure_co schema
-  - Change Airbyte destination schema to client_azure_co
-  - Resync Shopify → all tables land in client_azure_co
-  - Drop old public schema source tables
+Step 1 (Multi-tenancy): COMPLETE
 
-Step 2 (Schema registry and transformer):
-  - Build schema_discovery.py
-  - Build python_transformer.py with infer_transformation()
-  - Run against client_azure_co.shopify_orders
-  - Verify staging tables created correctly
+Step 2 (Schema registry and transformer): COMPLETE
+  - schema_discovery.py and python_transformer.py built
+  - Incremental load via _airbyte_extracted_at watermark
+  - Verified against shopify_orders (101 cols, stg created)
 
-Step 3 (Other sources):
-  - Connect Meta Ads via Airbyte → client_azure_co
-  - Connect Klaviyo via Airbyte → client_azure_co
-  - Connect Gorgias via Airbyte → client_azure_co
-  - Design GA4, Sentry, TikTok table schemas manually
-  - Create those tables in client_azure_co
+Step 3 (Other sources): IN PROGRESS
+  - Klaviyo: COMPLETE (6 tables, 67 cols, ALL PASS)
+  - Loop Returns: COMPLETE (3 placeholder tables, 35 cols, ALL PASS)
+  - GA4: COMPLETE (6 tables, 87 cols, ALL PASS — 0 rows expected)
+  - Meta Ads: pending Airbyte UI setup
+    NOTE: Read Section 8 before configuring — v22.0+ required
+  - Gorgias: pending Airbyte UI setup
+  - Sentry: schema manual design pending
+  - TikTok: schema manual design pending
 
 Step 4 (Add is_synthetic column):
   - ALTER TABLE to add is_synthetic to all source tables
