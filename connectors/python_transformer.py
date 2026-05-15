@@ -192,12 +192,8 @@ def _synthetic_condition(client_id: str, has_synthetic: bool) -> str:
             f"OR (SELECT use_synthetic_data FROM public.client_config "
             f"    WHERE client_id = '{client_id}') = true)"
         )
-    logger.warning(
-        "SOURCE: Python Transformer | CLIENT: %s | "
-        "WARN: is_synthetic column missing — synthetic data filter skipped. "
-        "Run Step 4 (ALTER TABLE to add is_synthetic) before going live.",
-        client_id,
-    )
+    # is_synthetic lives on staging tables, not on Airbyte-managed raw tables.
+    # Absence on the source is expected — no filter needed.
     return ''
 
 
@@ -328,6 +324,14 @@ def transform_table(client_id: str, table_name: str, conn) -> bool:
                 FROM {full_source}
                 WHERE 1 = 0
                 """
+            )
+            # is_synthetic is a fixed metadata column on every staging table.
+            # It is not in source_schema_registry — added explicitly here so
+            # Airbyte sync cycles never interfere with it (Airbyte only touches
+            # raw tables, never stg_* tables).
+            cur.execute(
+                f'ALTER TABLE {full_staging} '
+                f'ADD COLUMN IF NOT EXISTS is_synthetic boolean default false'
             )
             conn.commit()
 
