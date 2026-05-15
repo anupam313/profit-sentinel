@@ -754,7 +754,7 @@ Create at slack.com for personal testing of onboarding flow and alert formats be
 ## 10. Build Sequence from Current State
 
 ```
-CURRENT STATE (as of 2026-05-14):
+CURRENT STATE (as of 2026-05-15):
 ✓ Supabase database exists — client_azure_co schema
 ✓ Airbyte connected to Shopify dev store → client_azure_co
 ✓ dbt Cloud connected to Supabase and GitHub
@@ -763,16 +763,27 @@ CURRENT STATE (as of 2026-05-14):
 ✓ Dynamic transformer built (schema_discovery.py, python_transformer.py)
 ✓ Shopify: 47 raw tables + stg_shopify_orders (101 cols registered)
 ✓ Klaviyo: 6 tables + staging (67 cols registered, ALL PASS)
-✓ Loop Returns: 3 placeholder tables + staging (35 cols registered, ALL PASS)
+✓ Loop Returns: 2 tables + staging — API-verified schema (74 cols, ALL PASS)
+    loop_refunds DROPPED — no API endpoint in Loop Returns
+    loop_returns and loop_return_line_items rebuilt from official API docs
 ✓ GA4: 6 tables + staging (87 cols registered, ALL PASS)
-✗ Meta Ads: not yet connected via Airbyte
-✗ Gorgias: not yet connected via Airbyte
-✗ Sentry: schema not yet designed
-✗ TikTok: schema not yet designed
+✓ Meta Ads: 3 manual-schema tables + staging (149 cols, ALL PASS)
+    meta_ad_performance (99 cols), meta_campaigns (27), meta_ad_sets (23)
+    Breaking changes applied: unique_actions excluded, attribution_setting
+    included, stored_before_retention_limit added, Advantage+ fields only
+✓ Gorgias: 3 manual-schema tables + staging (59 cols, ALL PASS)
+    gorgias_tickets (26 cols), gorgias_ticket_messages (25), gorgias_tags (8)
+    tags stored as jsonb array on tickets — correct shape for Alert 5
+✓ TikTok: 1 manual-schema table + staging (58 cols, ALL PASS)
+    tiktok_ad_performance — Spark Ads creator attribution fields included
+✓ Sentry: 3 tables from real Airbyte sync + staging (101 cols, ALL PASS)
+    sentry_events (34 cols), sentry_issues (36), sentry_projects (31)
+✓ is_synthetic column on all 47 Shopify source tables (Step 4 COMPLETE)
 ✗ Synthetic data not seeded
 
-source_schema_registry totals: Shopify=101, Klaviyo=67,
-  Loop Returns=35, GA4=87 — Total: 290 columns registered
+source_schema_registry totals:
+  Shopify=101, Klaviyo=67, Loop Returns=74, GA4=87,
+  Meta=149, Gorgias=59, TikTok=58, Sentry=101 — Total: 696 columns registered
 
 IMMEDIATE NEXT STEPS:
 
@@ -783,15 +794,19 @@ Step 2 (Schema registry and transformer): COMPLETE
   - Incremental load via _airbyte_extracted_at watermark
   - Verified against shopify_orders (101 cols, stg created)
 
-Step 3 (Other sources): IN PROGRESS
+Step 3 (Other sources): IN PROGRESS — 1 sub-step remaining
   - Klaviyo: COMPLETE (6 tables, 67 cols, ALL PASS)
-  - Loop Returns: COMPLETE (3 placeholder tables, 35 cols, ALL PASS)
+  - Loop Returns: COMPLETE — API-verified (2 tables, 74 cols, ALL PASS)
   - GA4: COMPLETE (6 tables, 87 cols, ALL PASS — 0 rows expected)
-  - Meta Ads: pending Airbyte UI setup
-    NOTE: Read Section 8 before configuring — v22.0+ required
-  - Gorgias: pending Airbyte UI setup
-  - Sentry: schema manual design pending
-  - TikTok: schema manual design pending
+  - Meta Ads: COMPLETE — manual schema (3 tables, 149 cols, ALL PASS)
+      Real Airbyte sync still pending (Airbyte UI setup + v22.0+ verify)
+  - Gorgias: COMPLETE — manual schema (3 tables, 59 cols, ALL PASS)
+      Real Airbyte sync still pending (Airbyte UI setup)
+  - TikTok: COMPLETE — manual schema (1 table, 58 cols, ALL PASS)
+  - Sentry: COMPLETE — real Airbyte sync (3 tables, 101 cols, ALL PASS)
+      sentry_events, sentry_issues, sentry_projects
+
+Step 3 (Other sources): COMPLETE
 
 Step 4 (Add is_synthetic column):
   - ALTER TABLE to add is_synthetic to all source tables

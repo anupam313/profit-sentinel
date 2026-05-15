@@ -1,12 +1,40 @@
 """
-Steps 2-6 for the 3 manually-designed Loop Returns tables.
+Loop Returns — corrected pipeline (2026-05-15).
 
-  Step 2  — CREATE tables in Supabase (from manual schema design)
-  Step 3  — Verify tables exist
-  Step 4  — schema_discovery per table
-  Step 5  — python_transformer first load per table
-  Step 6  — python_transformer second run (incremental test)
-  Step 7  — Summary report
+Drops the 2026-05-14 placeholder tables and rebuilds from
+the API-verified schema in docs/manual_schemas/loop_returns_schema.sql.
+
+What changed vs the previous version and why:
+  loop_returns
+    id          text (was bigint — Loop IDs are strings)
+    state       replaces status (actual API field name)
+    type        replaces return_type (actual API field)
+    customer    text replaces customer_id bigint
+    processed_at REMOVED — not in API
+    destination_id replaces destination
+    total_refund_amount REMOVED — replaced by 11 financial fields
+    30 new fields from API (carrier, tracking, exchanges, etc.)
+
+  loop_return_line_items
+    line_item_id text replaces id bigint
+    return_id text added as FK
+    provider_line_item_id replaces order_line_item_id
+    quantity REMOVED — not in API
+    price/discount/tax now text (API returns strings)
+    return_reason_detail REMOVED — API uses return_comment
+    12 new fields (refund*, condition, disposition, etc.)
+
+  loop_refunds DROPPED — no API endpoint. Refund data is
+    embedded in loop_returns.refund and per-line fields.
+
+Steps run:
+  1. Drop staging and source tables + clear registry
+  2. Create corrected loop_returns and loop_return_line_items
+  3. Verify tables exist
+  4. schema_discovery per table
+  5. python_transformer first load per table
+  6. python_transformer second run (incremental test)
+  7. Row count verification + summary report
 """
 
 import contextlib
@@ -31,7 +59,8 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
 )
 
-TABLES      = ['loop_returns', 'loop_return_line_items', 'loop_refunds']
+# loop_refunds intentionally excluded — no API endpoint
+TABLES      = ['loop_returns', 'loop_return_line_items']
 CLIENT_ID   = 'azure_co'
 SCHEMA      = 'client_azure_co'
 SOURCE_NAME = 'loop_returns'
@@ -40,51 +69,104 @@ SEP         = '=' * 66
 DDL = [
     """
     CREATE TABLE IF NOT EXISTS client_azure_co.loop_returns (
-        id                      bigint          primary key,
-        order_id                bigint,
-        customer_id             bigint,
-        status                  text,
-        return_type             text,
-        created_at              timestamptz,
-        updated_at              timestamptz,
-        processed_at            timestamptz,
-        total_refund_amount     numeric,
-        currency                text,
-        destination             text,
-        _airbyte_extracted_at   timestamptz,
-        is_synthetic            boolean default false
+        id                          text primary key,
+        state                       text,
+        type                        text,
+        outcome                     text,
+        created_at                  text,
+        updated_at                  text,
+        edited_at                   text,
+        label_updated_at            text,
+        order_id                    text,
+        order_name                  text,
+        order_number                text,
+        provider_order_id           text,
+        provider_order_number       text,
+        customer                    text,
+        origin_country              text,
+        origin_country_code         text,
+        currency                    text,
+        multi_currency              boolean,
+        return_product_total        text,
+        return_discount_total       text,
+        return_tax_total            text,
+        return_total                text,
+        return_credit_total         text,
+        exchange_product_total      text,
+        exchange_discount_total     text,
+        exchange_tax_total          text,
+        exchange_total              text,
+        exchange_credit_total       text,
+        gift_card                   text,
+        gift_card_order_name        text,
+        gift_card_order_id          text,
+        handling_fee                text,
+        refund                      text,
+        upsell                      text,
+        carrier                     text,
+        tracking_number             text,
+        label_status                text,
+        label_url                   text,
+        label_rate                  text,
+        status_page_url             text,
+        destination_id              text,
+        package_reference           text,
+        return_method               jsonb,
+        exchanges                   jsonb,
+        labels                      jsonb,
+        _airbyte_extracted_at       timestamptz,
+        is_synthetic                boolean default false
     )
     """,
     """
     CREATE TABLE IF NOT EXISTS client_azure_co.loop_return_line_items (
-        id                      bigint          primary key,
-        return_id               bigint,
-        order_line_item_id      bigint,
-        variant_id              bigint,
-        product_id              bigint,
-        sku                     text,
-        quantity                integer,
-        return_reason           text,
-        return_reason_detail    text,
-        condition               text,
-        price                   numeric,
-        _airbyte_extracted_at   timestamptz,
-        is_synthetic            boolean default false
+        line_item_id                text,
+        return_id                   text not null,
+        provider_line_item_id       text,
+        product_id                  text,
+        variant_id                  text,
+        sku                         text,
+        barcode                     text,
+        title                       text,
+        price                       text,
+        discount                    text,
+        tax                         text,
+        refund                      text,
+        refund_item                 text,
+        refund_tax                  text,
+        return_reason               text,
+        parent_return_reason        text,
+        return_comment              text,
+        outcome                     text,
+        returned_at                 text,
+        exchange_variant            text,
+        provider_restock_location_id    text,
+        consolidation_tracking          text,
+        consolidation_destination_id    text,
+        condition                   jsonb,
+        disposition                 jsonb,
+        _airbyte_extracted_at       timestamptz,
+        is_synthetic                boolean default false,
+        UNIQUE (return_id, line_item_id)
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS client_azure_co.loop_refunds (
-        id                      bigint          primary key,
-        return_id               bigint,
-        amount                  numeric,
-        currency                text,
-        status                  text,
-        refund_method           text,
-        created_at              timestamptz,
-        _airbyte_extracted_at   timestamptz,
-        is_synthetic            boolean default false
-    )
-    """,
+]
+
+# Tables to drop (source + staging + the removed loop_refunds)
+TABLES_TO_DROP = [
+    f'{SCHEMA}.stg_loop_refunds',
+    f'{SCHEMA}.stg_loop_return_line_items',
+    f'{SCHEMA}.stg_loop_returns',
+    f'{SCHEMA}.loop_refunds',
+    f'{SCHEMA}.loop_return_line_items',
+    f'{SCHEMA}.loop_returns',
+]
+
+# Registry table_names to clear (includes the removed table)
+REGISTRY_TABLES_TO_CLEAR = [
+    'loop_returns',
+    'loop_return_line_items',
+    'loop_refunds',
 ]
 
 
@@ -126,10 +208,54 @@ def main():
     results = {t: {} for t in TABLES}
 
     # ------------------------------------------------------------------
-    # STEP 2 — create tables
+    # STEP 1a — drop staging and source tables
     # ------------------------------------------------------------------
     print(SEP)
-    print('STEP 2 -- Creating Loop Returns tables in Supabase')
+    print('STEP 1a -- Dropping existing tables (placeholder schema)')
+    print(SEP)
+    for qualified in TABLES_TO_DROP:
+        try:
+            cur.execute(f'DROP TABLE IF EXISTS {qualified} CASCADE')
+            print(f'  DROPPED  {qualified}')
+        except Exception as exc:
+            print(f'  ERR      {qualified}  {exc}')
+    conn.commit()
+    print()
+
+    # ------------------------------------------------------------------
+    # STEP 1b — clear source_schema_registry and schema_versions
+    # ------------------------------------------------------------------
+    print(SEP)
+    print('STEP 1b -- Clearing registry for loop_returns tables')
+    print(SEP)
+    for tbl in REGISTRY_TABLES_TO_CLEAR:
+        cur.execute(
+            """
+            DELETE FROM public.source_schema_registry
+            WHERE client_id = %s AND table_name = %s
+            """,
+            (CLIENT_ID, tbl),
+        )
+        deleted = cur.rowcount
+        print(f'  registry  {tbl:<30}  {deleted} rows deleted')
+
+        cur.execute(
+            """
+            DELETE FROM public.schema_versions
+            WHERE client_id = %s AND table_name = %s
+            """,
+            (CLIENT_ID, tbl),
+        )
+        deleted_sv = cur.rowcount
+        print(f'  versions  {tbl:<30}  {deleted_sv} rows deleted')
+    conn.commit()
+    print()
+
+    # ------------------------------------------------------------------
+    # STEP 2 — create corrected tables
+    # ------------------------------------------------------------------
+    print(SEP)
+    print('STEP 2 -- Creating corrected Loop Returns tables')
     print(SEP)
     for stmt in DDL:
         label = stmt.strip().splitlines()[0].strip()[:60]
@@ -137,7 +263,8 @@ def main():
             cur.execute(stmt)
             print(f'  OK   {label}')
         except Exception as exc:
-            print(f'  ERR  {label}\n       {exc}')
+            print(f'  ERR  {label}')
+            print(f'       {exc}')
     conn.commit()
     print()
 
@@ -204,7 +331,7 @@ def main():
         (CLIENT_ID, SOURCE_NAME),
     )
     total = cur2.fetchone()[0]
-    print(f'\n  Total loop_returns columns registered: {total}')
+    print(f'\n  Total loop_returns columns in registry: {total}')
     print()
 
     # ------------------------------------------------------------------
@@ -275,39 +402,69 @@ def main():
             f'  {table:<30}  {status}  '
             f'mode={mode}  rows={rows}  wm_col={wm_col}  ({elapsed:.1f}s)'
         )
-
         if not inc_pass:
             print(f'    >> success={success}  wm_val={wm_val}')
+    print()
+
+    # ------------------------------------------------------------------
+    # STEP 7 — row count verification
+    # ------------------------------------------------------------------
+    print(SEP)
+    print('STEP 7 -- Row count verification (raw vs staging)')
+    print(SEP)
+    cur3 = conn.cursor()
+    for table in TABLES:
+        raw     = get_row_count(cur3, f'{SCHEMA}.{table}')
+        staging = get_row_count(cur3, f'{SCHEMA}.stg_{table}')
+        match   = (raw == staging) and not isinstance(raw, str)
+        results[table]['raw_count']     = raw
+        results[table]['staging_count'] = staging
+        results[table]['count_match']   = match
+        status = 'MATCH' if match else 'MISMATCH'
+        print(
+            f'  {table:<30}  '
+            f'raw={raw!s:<6}  staging={staging!s:<6}  {status}'
+        )
     print()
 
     conn.close()
 
     # ------------------------------------------------------------------
-    # STEP 7 — summary
+    # STEP 8 — summary
     # ------------------------------------------------------------------
     print(SEP)
-    print('STEP 7 -- Summary')
+    print('STEP 8 -- Summary')
     print(SEP)
     print(
         f'  {"Table":<30}  {"Cols":>4}  '
-        f'{"Stg?":>5}  {"2-run":>6}  Fallbacks'
+        f'{"Raw":>6}  {"Stg":>6}  '
+        f'{"Counts":>7}  {"2-run":>6}  Fallbacks'
     )
-    print('  ' + '-' * 58)
+    print('  ' + '-' * 66)
     all_pass = True
     for table in TABLES:
         r        = results[table]
         cols     = r.get('reg_cols', '?')
-        stg      = 'yes' if r.get('run1_ok') else 'no'
-        two_run  = 'PASS' if r.get('inc_pass') else 'FAIL'
+        raw      = r.get('raw_count', '?')
+        stg      = r.get('staging_count', '?')
+        counts   = 'MATCH' if r.get('count_match') else 'FAIL'
+        two_run  = 'PASS'  if r.get('inc_pass')    else 'FAIL'
         fallback = r.get('run1_fallbacks', '?')
-        if two_run == 'FAIL' or stg == 'no':
+        if counts == 'FAIL' or two_run == 'FAIL':
             all_pass = False
         print(
             f'  {table:<30}  {cols!s:>4}  '
-            f'{stg:>5}  {two_run:>6}  {fallback}'
+            f'{raw!s:>6}  {stg!s:>6}  '
+            f'{counts:>7}  {two_run:>6}  {fallback}'
         )
     print()
     print(f'  Overall: {"ALL PASS" if all_pass else "SEE FAILURES ABOVE"}')
+    print()
+    print('  Removed from client_azure_co:')
+    print('    loop_refunds        — no API endpoint in Loop Returns')
+    print('    stg_loop_refunds    — staging for removed table')
+    print('  Registry cleared for: loop_returns, loop_return_line_items,')
+    print('                        loop_refunds')
     print(SEP)
     return results
 
