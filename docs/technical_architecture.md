@@ -1145,7 +1145,7 @@ Create at slack.com for personal testing of onboarding flow and alert formats be
 ## 10. Build Sequence from Current State
 
 ```
-CURRENT STATE (as of 2026-05-15):
+CURRENT STATE (as of 2026-05-16):
 ✓ Supabase database exists — client_azure_co schema
 ✓ Airbyte connected to Shopify dev store → client_azure_co
 ✓ dbt Cloud connected to Supabase and GitHub
@@ -1170,7 +1170,17 @@ CURRENT STATE (as of 2026-05-15):
 ✓ Sentry: 3 tables from real Airbyte sync + staging (101 cols, ALL PASS)
     sentry_events (34 cols), sentry_issues (36), sentry_projects (31)
 ✓ is_synthetic column on all 47 Shopify source tables (Step 4 COMPLETE)
-✗ Synthetic data not seeded
+✓ Shopify seed script written (Step 5 Shopify COMPLETE — 2026-05-16)
+    connectors/seed_shopify.py — 2,611 lines
+    connectors/seed_manifest_shopify.json — cross-source alignment manifest
+    14 functions: sku_master, customers, orders, line_items, refunds,
+    fulfillments, discount_codes, touchpoint_journeys, brand_event_calendar,
+    dq_scores, alert_log, suppression_log, validate_seed, write_manifest
+    Two-system architecture (correlated multivariate + episodic calendar)
+    120 SKUs, 14,000 customers, ~22,000 orders, 30 influencer activations
+    50+ brand_event_calendar entries, 11-check validation block
+✗ Shopify seed not yet executed against database
+✗ Meta, Klaviyo, Gorgias, GA4, Sentry, Loop Returns seed scripts not yet written
 
 source_schema_registry totals:
   Shopify=101, Klaviyo=67, Loop Returns=74, GA4=87,
@@ -1203,10 +1213,17 @@ Step 4 (Add is_synthetic column):
   - ALTER TABLE to add is_synthetic to all source tables
 
 Step 5 (Seed script):
-  - Write comprehensive seed script (all 6 sources)
-  - Shared event calendar across all sources
-  - Insert 24 months synthetic data with 76 DQ issues
-  - Validate 5 cross-source narrative scenarios
+  Shopify: COMPLETE (2026-05-16)
+    connectors/seed_shopify.py — full 24-month seed, two-system architecture
+    connectors/seed_manifest_shopify.json — order IDs, SKU list, customer IDs,
+      episodic events and cross-source alignment notes for remaining 5 source seeds
+  Remaining: Meta, Klaviyo, Gorgias, GA4, Sentry, Loop Returns seed scripts
+    Each must consume seed_manifest_shopify.json for cross-source alignment
+    Meta and TikTok seeds must implement TikTok disruption data signature (D1-D11)
+    Klaviyo seed must implement 15-flow architecture (E1-E40) and emergency send (D18)
+    Gorgias seed must implement tag taxonomy including GD5 normalisation
+    Loop Returns seed must implement three-stage return chain (A6) and defective SKU
+    GA4 seed must implement viral moment direct traffic spikes (A13)
 
 Step 6 (dbt rebuild):
   - Update dbt_project.yml with client_schema variable
