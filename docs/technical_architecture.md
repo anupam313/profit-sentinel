@@ -339,6 +339,397 @@ sentry_errors_daily
 
 ---
 
+### 3.4 — New Tables Defined During Seed Design (Gaps A–G)
+
+*Added 2026-05-16. These tables were designed during the seed script design session (Gaps A–G). They belong to either `client_azure_co` or the `public` schema as indicated. Schema is noted in each DDL. None of these tables exist yet in the database — they are created by the seed script (Step 5).*
+
+#### brand_event_calendar
+
+Drives all 50 suppression scenarios (S1–S50). The most critical table in the suppression architecture.
+
+```sql
+CREATE TABLE client_azure_co.brand_event_calendar (
+    id                      bigint generated always as identity primary key,
+    client_id               text not null,
+    event_name              text not null,
+    event_type              text not null,
+    -- valid values: 'collection_launch' / 'sale_period' / 'retail_holiday' /
+    -- 'influencer_campaign' / 'supplier_event' / 'platform_disruption' /
+    -- 'klaviyo_ab_test' / 'klaviyo_feature_activation' / 'email_template_update' /
+    -- 'operational_change' / 'supplier_quality_event' / 'bfcm_sunset_spike' /
+    -- 'photography_update' / 'size_guide_update' / 'influencer_gift_shipment' /
+    -- 'price_change' / 'platform_disruption_partial' / 'platform_disruption_secondary' /
+    -- 'platform_algorithm_change'
+    start_date              date not null,
+    end_date                date not null,
+    suppress_alerts         text[],         -- full suppression (State 3)
+    context_alerts          text[],         -- partial context (State 2)
+    context_explanation     text,           -- what to include in Layer 2 for State 2 alerts
+    residual_threshold_pct  numeric,        -- fire only if signal exceeds seasonal explanation by this %
+    confidence_decay_type   text,           -- 'linear' / 'step' / 'exponential'
+    confidence_decay_start  date,
+    confidence_decay_end    date,
+    confidence_at_peak      numeric default 1.0,
+    detection_method        text default 'auto',  -- 'auto' / 'manual' / 'hardcoded'
+    detection_lag_hours     integer,        -- hours after event start it was logged
+    confidence              numeric default 1.0,  -- 0–1 confidence that event is still ongoing
+    last_verified_at        timestamptz,
+    is_recurring            boolean default false,
+    recurrence_rule         text,           -- 'annual' / 'monthly' / null
+    auto_detected           boolean default true,
+    detected_from           text,           -- source that triggered auto-detection
+    event_profile           jsonb,          -- S46: BFCM pre-event answers (discount depth, email window)
+    suppression_type        text default 'reactive',  -- 'reactive' / 'predictive'
+    is_synthetic            boolean default true,
+    created_at              timestamptz default now()
+);
+```
+
+#### network_pattern_benchmarks
+
+Stores cross-client pattern benchmarks for Moat 2 (Fashion Intelligence Network). In `public` schema — not client-specific.
+
+```sql
+CREATE TABLE public.network_pattern_benchmarks (
+    id                          bigint generated always as identity primary key,
+    alert_type                  text not null,
+    archetype                   text not null,    -- 'premium_womenswear' / 'athleisure' etc.
+    metric_name                 text,             -- e.g. 'open_rate' / 'roas' / 'return_rate'
+    pattern_description         text,
+    benchmark_median            numeric,
+    benchmark_p25               numeric,          -- poor performance threshold
+    benchmark_p75               numeric,          -- good performance threshold
+    benchmark_bfcm_typical      numeric,          -- BFCM-period typical value
+    network_confirmation_rate   numeric,          -- 0–1: confirmed in X% of similar brands
+    sample_size                 integer,
+    period_type                 text,             -- 'annual' / 'bfcm' / 'launch_period' / 'quiet'
+    last_updated                timestamptz default now(),
+    created_at                  timestamptz default now()
+);
+```
+
+#### sku_cost_master
+
+COGS source for D1, D3, D4, H5 alerts. Accepts both regular SKU records and influencer gifting package costs. Populated from Finaloop CSV export (no Airbyte connector exists for Finaloop).
+
+```sql
+CREATE TABLE client_azure_co.sku_cost_master (
+    id                      bigint generated always as identity primary key,
+    client_id               text not null,
+    shopify_variant_id      text not null,
+    sku                     text not null,
+    record_type             text not null,  -- 'sku_cogs' / 'influencer_gifting_package'
+    supplier_cost           numeric,        -- ex-factory cost only
+    landed_cost             numeric,        -- supplier_cost × landed_cost_multiplier (1.28)
+    landed_cost_source      text,           -- 'finaloop_export' / 'derived' / 'manual'
+    -- Gifting package fields (populated when record_type = 'influencer_gifting_package'):
+    influencer_id           text,           -- nullable for standard SKU records
+    package_landed_cost     numeric,        -- full package (3–5 items) at landed cost
+    packaging_cost          numeric,        -- branded box, tissue, handwritten note
+    shipping_cost           numeric,        -- express shipping to creator
+    total_package_cost      numeric,        -- sum of package_landed_cost + packaging + shipping
+    featured_item_sku       text,           -- SKU shown in TikTok content
+    non_featured_item_skus  text[],         -- other SKUs in gifting package
+    effective_from          date not null,
+    effective_to            date,           -- null = currently active
+    is_synthetic            boolean default true,
+    created_at              timestamptz default now(),
+    updated_at              timestamptz default now()
+);
+```
+
+#### suppression_log
+
+Audit trail for every suppression event (S1–S50). Every suppression row has five mandatory explanation fields to make suppressions founder-queryable.
+
+```sql
+CREATE TABLE client_azure_co.suppression_log (
+    id                          bigint generated always as identity primary key,
+    client_id                   text not null,
+    signal_detected_at          timestamptz,    -- null for predictive suppressions
+    alert_type                  text not null,
+    signal_value                numeric,
+    threshold_value             numeric,
+    suppression_reason          text not null,
+    suppression_category        text not null,  -- S1–S50 reference code
+    suppression_state           integer,        -- 2 (State 2) or 3 (State 3)
+    suppression_type            text default 'reactive', -- 'reactive' / 'predictive' / 'retraction'
+    variance_explained_pct      numeric,        -- S38: % of signal explained by suppression reason
+    residual_signal             numeric,        -- unexplained remainder (nullable for State 3)
+    suppression_source          text,           -- brand_event_calendar entry reference
+    suppression_stack           jsonb,          -- all simultaneous suppressions + stacking rule applied
+    would_have_fired_at         timestamptz,
+    -- Five mandatory explanation fields (S40):
+    detected_signal_description     text,
+    threshold_context               text,
+    suppression_explanation         text,
+    residual_signal_description     text,
+    founder_verification_action     text,
+    -- S50 retraction fields:
+    original_alert_log_id       bigint,         -- references the alert being retracted
+    retraction_reason           text,
+    provisional_revised_value   numeric,
+    full_accuracy_expected_at   timestamptz,
+    founder_queryable           boolean default true,
+    created_at                  timestamptz default now()
+);
+```
+
+#### alert_data_lineage
+
+Links every fired alert to the specific source rows that produced it. Enables founder verification: "show me the orders in this ROAS figure."
+
+```sql
+CREATE TABLE client_azure_co.alert_data_lineage (
+    id                  bigint generated always as identity primary key,
+    alert_log_id        bigint references public.alert_log(id),
+    source              text not null,
+    metric_name         text not null,
+    metric_value        numeric,
+    source_row_ids      text[],         -- specific row IDs from source table
+    source_query        text,           -- the SQL that produced this metric value
+    row_count           integer,
+    date_range_start    date,
+    date_range_end      date,
+    created_at          timestamptz default now()
+);
+```
+
+#### dq_metric_scores
+
+Multi-dimensional DQ model. Replaces the single DQ score in client_config with per-source, per-domain scores. Stores time-series rows so DQ improvement arc is tracked across the 24-month seed period.
+
+```sql
+CREATE TABLE client_azure_co.dq_metric_scores (
+    id                   bigint generated always as identity primary key,
+    client_id            text not null,
+    source               text not null,       -- 'shopify' / 'meta' / 'klaviyo' etc.
+    metric_domain        text not null,
+    -- valid values: 'orders' / 'inventory' / 'customers' / 'refunds' /
+    -- 'ad_performance' / 'attribution' / 'flow_performance' /
+    -- 'ticket_volume' / 'ticket_tags' / 'funnel_performance' /
+    -- 'error_rate' / 'cross_source_attribution'
+    dq_score             numeric not null,    -- 0–100
+    dq_issues            text[],             -- specific issue codes affecting this domain (e.g. 'SD1')
+    alert_types_affected text[],             -- which alerts read from this metric domain
+    confidence_cap       numeric,            -- maximum confidence for affected alerts
+    freshness_tier       text,              -- 'realtime' / 'batch' / 'daily'
+    effective_from       timestamptz,
+    effective_to         timestamptz,        -- null = currently active
+    created_at           timestamptz default now()
+);
+```
+
+#### dq_events
+
+Tracks DQ issue occurrences including cascade chains. A single DQ event (e.g. Shopify webhook failure) cascades to downstream sources with explicit lag and duration.
+
+```sql
+CREATE TABLE client_azure_co.dq_events (
+    id                      bigint generated always as identity primary key,
+    client_id               text not null,
+    source                  text not null,
+    dq_issue_code           text not null,  -- e.g. 'SD1' / 'MD2' / 'GD5'
+    metric_domain           text not null,
+    started_at              timestamptz not null,
+    resolved_at             timestamptz,    -- null = still active
+    peak_severity           integer,        -- 0–100 (100 = complete data failure)
+    recovery_duration_hours integer,
+    recovery_dq_curve       jsonb,          -- {hour: dq_score} pairs during recovery period
+    backlog_order_count     integer,        -- for webhook failure events
+    backlog_processing_lag  integer,        -- hours to process backlog after recovery
+    cascade_to              text[],         -- downstream dq_issue_codes triggered by this event
+    cascade_lag_hours       integer,
+    cascade_duration_hours  integer,
+    alerts_suppressed       text[],         -- alert types suppressed during this event
+    alerts_capped           jsonb,          -- {alert_type: confidence_cap_value}
+    is_synthetic            boolean default true,
+    created_at              timestamptz default now()
+);
+```
+
+#### permanent_dq_limitations
+
+Structural measurement limitations that are not fixable (dark social, cross-device attribution gap, etc.). Included as Layer 2 caveat in affected alerts — framed as measurement system limitations, not DQ warnings.
+
+```sql
+CREATE TABLE public.permanent_dq_limitations (
+    id                  bigint generated always as identity primary key,
+    limitation_name     text not null,
+    affected_sources    text[],
+    affected_alerts     text[],
+    estimated_impact    text,
+    estimated_magnitude text,
+    caveat_text         text,           -- exact text included in Layer 2 of affected alerts
+    is_resolvable       boolean default false,
+    resolution_path     text            -- null if is_resolvable = false
+);
+```
+
+Five permanent limitations seeded: dark social attribution (15–20% orders unattributable), cross-device session gap (18% journeys unstitched), TikTok view-through attribution uncertainty, influencer offline amplification systematic understatement, and GDPR deletion historical gap (progressively less complete over time).
+
+#### klaviyo_flow_id_history
+
+Tracks flow ID changes caused by agency-to-in-house transitions or rebuilds. Required to maintain historical flow attribution continuity across the Month 18 agency transition event.
+
+```sql
+CREATE TABLE client_azure_co.klaviyo_flow_id_history (
+    id                  bigint generated always as identity primary key,
+    client_id           text not null,
+    old_flow_id         text not null,
+    new_flow_id         text,
+    flow_name           text not null,
+    change_reason       text,
+    effective_from      date not null,
+    effective_to        date,
+    created_at          timestamptz default now()
+);
+```
+
+#### synthetic_touchpoint_journey
+
+Multi-touch attribution journey data. 35–45% of orders have multi-touch journeys seeded explicitly. Required for Alert A5 (Klaviyo double-attribution) and Alert 3 (Cohort B contested attribution logic).
+
+```sql
+CREATE TABLE client_azure_co.synthetic_touchpoint_journey (
+    order_id            text not null,
+    touchpoint_sequence integer not null,
+    channel             text,
+    touchpoint_date     date,
+    touchpoint_type     text,   -- 'impression' / 'click' / 'email_open'
+    campaign_id         text,
+    influencer_id       text    -- nullable
+);
+```
+
+#### tiktok_organic_performance
+
+Tracks TikTok organic reach index and posting frequency. Required for the TikTok disruption organic reach recovery arc (D5) and Alert B3.
+
+```sql
+CREATE TABLE client_azure_co.tiktok_organic_performance (
+    id                  bigint generated always as identity primary key,
+    client_id           text not null,
+    date                date not null,
+    organic_reach_rate  numeric,    -- normalised index (Dec 2023 baseline = 1.0)
+    posting_frequency   numeric,    -- posts per week
+    impressions         bigint,
+    video_views         bigint,
+    engagement_rate     numeric,
+    created_at          timestamptz default now()
+);
+```
+
+#### tag_normalisation
+
+Maps raw Gorgias agent tags to canonical tags. 40–60 entries for Archetype A. Primary tool for reducing Alert 5 (C1) false positive rate — GD5 (Gorgias tag inconsistency) is the leading cause of Alert 5 false positives.
+
+```sql
+CREATE TABLE client_azure_co.tag_normalisation (
+    id                  bigint generated always as identity primary key,
+    client_id           text not null,
+    raw_tag             text not null,
+    canonical_tag       text not null,
+    category            text,           -- 'sizing_issue' / 'wismo' / 'product_quality' etc.
+    created_at          timestamptz default now()
+);
+```
+
+Example mappings: `'runs small' → 'sizing_issue'`, `'runs small — tops' → 'sizing_issue_tops'`, `'fit issue — tops' → 'sizing_issue_tops'`, `'too small' → 'sizing_issue'`, `'too big' → 'sizing_issue'`.
+
+#### klaviyo_sms_events
+
+SMS event tracking distinct from email events. Required for Flow 7 (SMS Welcome + Abandoned Cart) and double-attribution detection between SMS and email on abandoned cart recoveries.
+
+```sql
+CREATE TABLE client_azure_co.klaviyo_sms_events (
+    id                  bigint generated always as identity primary key,
+    client_id           text not null,
+    profile_id          text not null,
+    event_type          text not null,  -- 'sms_sent' / 'sms_delivered' / 'sms_clicked' / 'sms_opted_out'
+    flow_id             text,           -- nullable for campaign SMS
+    campaign_id         text,           -- nullable for flow SMS
+    message_type        text,           -- 'welcome' / 'abandoned_cart' / 'campaign'
+    sent_at             timestamptz,
+    delivered_at        timestamptz,
+    clicked_at          timestamptz,
+    opted_out_at        timestamptz,
+    attributed_order_id text,
+    attributed_revenue  numeric,
+    is_synthetic        boolean default true,
+    created_at          timestamptz default now()
+);
+```
+
+#### meta_billing_statement
+
+Stores exact billing figures (6 decimal places) for financial reconciliation with pipeline spend (2 decimal places from API). Required for Alert H17 — financial reconciliation gap.
+
+```sql
+CREATE TABLE client_azure_co.meta_billing_statement (
+    id                      bigint generated always as identity primary key,
+    client_id               text not null,
+    statement_month         date not null,      -- first day of billing month
+    total_spend_exact       numeric(18,6),      -- 6 decimal places (exact billing figure)
+    total_spend_api         numeric(10,2),      -- 2 decimal places (API-rounded sum)
+    rounding_gap            numeric(10,6),      -- total_spend_exact - total_spend_api
+    currency                text default 'USD',
+    statement_date          date,
+    source                  text default 'finaloop',
+    is_synthetic            boolean default true,
+    created_at              timestamptz default now()
+);
+```
+
+#### tiktok_billing_statement
+
+Same structure as meta_billing_statement for TikTok wallet-based billing. Required for H17 (Month 15 TikTok reconciliation gap event) and D19 (TikTok wallet prepayment vs ad spend accrual tracking).
+
+```sql
+CREATE TABLE client_azure_co.tiktok_billing_statement (
+    id                      bigint generated always as identity primary key,
+    client_id               text not null,
+    statement_month         date not null,
+    total_spend_exact       numeric(18,6),
+    total_spend_api         numeric(10,2),
+    rounding_gap            numeric(10,6),
+    currency                text default 'USD',
+    statement_date          date,
+    source                  text default 'finaloop',
+    is_synthetic            boolean default true,
+    created_at              timestamptz default now()
+);
+```
+
+#### alert_log — New Fields (ALTER TABLE)
+
+The following columns are additive to the existing `public.alert_log` table defined in Section 3.2. All existing columns are unchanged.
+
+```sql
+ALTER TABLE public.alert_log
+    ADD COLUMN IF NOT EXISTS fatigue_period_active       boolean default false,
+    ADD COLUMN IF NOT EXISTS fatigue_reason              text,
+    -- 'founder_stress_external_event' / 'alert_accumulation'
+    ADD COLUMN IF NOT EXISTS dismissal_correct           boolean,
+    -- null = outcome unknown, true = founder correctly dismissed, false = founder wrong to dismiss
+    ADD COLUMN IF NOT EXISTS revenue_impact_missed       numeric,
+    -- estimated $ impact when a correct alert was wrongly dismissed
+    ADD COLUMN IF NOT EXISTS delivery_delayed_hours      integer,
+    ADD COLUMN IF NOT EXISTS delay_reason                text,
+    -- 'shopify_sync_lag' / 'business_hours' / 'dq_wait'
+    ADD COLUMN IF NOT EXISTS klaviyo_native_revenue      numeric,
+    ADD COLUMN IF NOT EXISTS profit_sentinel_adjusted_revenue numeric,
+    -- gap between these two = double-attribution amount (18–32% during active campaigns)
+    ADD COLUMN IF NOT EXISTS alert_instance_number       integer default 1,
+    -- 1 = first firing, 2 = second firing (Cat 18 repeat alert escalation)
+    ADD COLUMN IF NOT EXISTS escalation_level            integer default 1,
+    -- 1 = standard, 2 = elevated, 3 = critical
+    ADD COLUMN IF NOT EXISTS suppression_type            text;
+    -- 'reactive' / 'predictive' / null
+```
+
+---
+
 ## 4. Data Flow — Step by Step
 
 ### Step 1: Airbyte Sync
