@@ -341,7 +341,7 @@ sentry_errors_daily
 
 ### 3.4 — New Tables Defined During Seed Design (Gaps A–G)
 
-*Added 2026-05-16. These tables were designed during the seed script design session (Gaps A–G). They belong to either `client_azure_co` or the `public` schema as indicated. Schema is noted in each DDL. None of these tables exist yet in the database — they are created by the seed script (Step 5).*
+*Added 2026-05-16. These tables were designed during the seed script design session (Gaps A–G). They belong to either `client_azure_co` or the `public` schema as indicated. All 16 tables created in Supabase on 2026-05-16 via connectors/_create_seed_tables.py. public.alert_log also extended with 11 new columns on the same date.*
 
 #### brand_event_calendar
 
@@ -1217,6 +1217,9 @@ Step 5 (Seed script):
     connectors/seed_shopify.py — full 24-month seed, two-system architecture
     connectors/seed_manifest_shopify.json — order IDs, SKU list, customer IDs,
       episodic events and cross-source alignment notes for remaining 5 source seeds
+    connectors/_create_seed_tables.py — creates all 16 seed-support tables +
+      extends public.alert_log with 11 columns. Run once before seed_shopify.py.
+      All tables confirmed CREATED in Supabase 2026-05-16.
   Remaining: Meta, Klaviyo, Gorgias, GA4, Sentry, Loop Returns seed scripts
     Each must consume seed_manifest_shopify.json for cross-source alignment
     Meta and TikTok seeds must implement TikTok disruption data signature (D1-D11)
