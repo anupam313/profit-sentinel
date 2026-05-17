@@ -344,7 +344,8 @@ CREATE TABLE IF NOT EXISTS {SCHEMA}.tiktok_ad_performance (
     _airbyte_raw_id         text,
     _airbyte_extracted_at   timestamptz,
     _airbyte_meta           text,
-    _airbyte_generation_id  bigint
+    _airbyte_generation_id  bigint,
+    CONSTRAINT uq_tiktok_adperf_camp_date UNIQUE (campaign_id, date)
 );
 """
 
@@ -363,7 +364,8 @@ CREATE TABLE IF NOT EXISTS {SCHEMA}.tiktok_organic_performance (
     _airbyte_raw_id         text,
     _airbyte_extracted_at   timestamptz,
     _airbyte_meta           text,
-    _airbyte_generation_id  bigint
+    _airbyte_generation_id  bigint,
+    CONSTRAINT uq_tiktok_organic_week UNIQUE (week_start)
 );
 """
 
@@ -389,7 +391,8 @@ CREATE TABLE IF NOT EXISTS public.suppression_log (
     suppression_explanation     text,
     residual_signal_description text,
     founder_verification_action text,
-    created_at                  timestamptz default now()
+    created_at                  timestamptz default now(),
+    CONSTRAINT uq_suppression_log_signal UNIQUE (client_id, alert_type, would_have_fired_at)
 );
 """
 
@@ -848,14 +851,26 @@ def seed_tiktok_alerts(cur) -> None:
             ),
         ))
 
-        # Bulk insert alert_log
+        # Skip rows that already exist (alert_log has no unique constraint beyond PK)
+        existing_keys: set[tuple] = set()
+        cur.execute(
+            "SELECT client_id, alert_type, fired_at FROM public.alert_log "
+            "WHERE client_id = %s AND alert_type = ANY(%s)",
+            (CLIENT_ID, ['B1_tiktok', 'D1_tiktok', 'H6']),
+        )
+        for row in cur.fetchall():
+            existing_keys.add((row[0], row[1], row[2]))
+
+        # fired_at is col index 2 in alert_cols (client_id=0, alert_type=1, fired_at=2)
+        new_rows = [r for r in rows
+                    if (r[0], r[1], r[2]) not in existing_keys]
         n = 0
-        for i in range(0, len(rows), 200):
-            sql = (f'INSERT INTO public.alert_log ({", ".join(alert_cols)}) '
-                   f'VALUES %s ON CONFLICT DO NOTHING')
-            psycopg2.extras.execute_values(cur, sql, rows[i: i + 200])
-            n += len(rows[i: i + 200])
-        logger.info('seed_tiktok_alerts | alert_log rows: %d', n)
+        for i in range(0, len(new_rows), 200):
+            sql = f'INSERT INTO public.alert_log ({", ".join(alert_cols)}) VALUES %s'
+            psycopg2.extras.execute_values(cur, sql, new_rows[i: i + 200])
+            n += len(new_rows[i: i + 200])
+        logger.info('seed_tiktok_alerts | alert_log rows: %d (skipped %d existing)',
+                    n, len(rows) - n)
 
     except Exception as e:
         logger.error('SOURCE: TikTok Seed | CLIENT: %s | ERROR: %s | CONTEXT: alerts',
