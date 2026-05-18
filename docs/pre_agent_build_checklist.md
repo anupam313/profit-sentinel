@@ -18,7 +18,22 @@ All items below must be complete before Step 9.
 | A-4 | Staleness flags in mart_causal_chain_daily | COMPLETE ✓ | Commit c6c5818 |
 | A-5 | client_id var correct in dbt_project.yml | COMPLETE ✓ | Commit 2cad0e6 |
 | A-6 | generate_schema_name macro | COMPLETE ✓ | Commit 2cad0e6 |
-| A-7 | Step 7 validation matrix (37 alerts) | PENDING | Next session |
+| A-7 | Step 7 validation matrix (37 alerts) | COMPLETE ✓ | 2026-05-18. 27 PASS, 6 PARTIAL, 4 FAIL (non-blocking). See step7_gaps below |
+
+### Step 7 Gaps (found during validation — not blocking Agent A Step 8)
+
+| # | Gap | Impacts | Notes |
+|---|-----|---------|-------|
+| A-7a | `meta_cpm_change_pct`, `meta_roas_change_pct` not in mart | A2, B4 | Agent A must compute from stg_meta_ad_performance; staging proxy confirmed 68 ROAS-drop days, 109 CPM-spike days |
+| A-7b | `meta_ctr_7d_avg`, `meta_cpm_7d_avg` rolling cols not in mart | B1 | Alert seeded (13 rows); mart must expose these for Agent A threshold scan |
+| A-7c | `predicted_return_spike_risk`, sizing complaint cols not in mart | C1 | Alert5 seeded (8 rows); Agent A derives from stg_gorgias_tickets + stg_loop_returns |
+| A-7d | `contribution_margin_change_pct`, `using_prior_year_baseline` not in mart | D1, D6 | py_* columns present (366 days); Agent A computes proxy from py_gross_revenue |
+| A-7e | `loop_lifestyle_change_count`, `loop_fit_quality_count` not in mart | C7 | lifestyle keyword absent from stg_loop_returns.return_reasons; seed gap |
+| A-7f | `stg_klaviyo_profiles` staging view not built | E1–E4 | Raw table has 18,200 rows; staging model needed before E-series full validation |
+| A-7g | `unit_cost` NULL in stg_shopify_inventory_items | G2/G3, D3 | 1-row seed limitation; Shopify cost field not populated in seed |
+| A-7h | C4 seed: only 3 days return_count > 20 (spec: > 20 days) | C4 | Seed generates low peak returns; not blocking Agent A |
+| A-7i | D2 seed: discount_rate = 14.1% (spec: 20–50%) | D2 | Seed generates fewer discounted orders; not blocking Agent A |
+| A-7j | E repeat_purchase_rate = 1.000 (spec: 0.25–0.45) | E2 | All-time 24-month rate ≈ 1.0 for synthetic data; metric needs 90-day window definition |
 
 ---
 
