@@ -105,6 +105,7 @@ date_spine as (
 
 select
     ds.date,
+    '{{ var("client_id") }}'::text                                      as client_id,
 
     -- Revenue
     coalesce(r.gross_revenue, 0)                                        as gross_revenue,

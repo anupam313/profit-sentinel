@@ -18,6 +18,7 @@ clean-targets:
 
 vars:
   client_id: 'client_azure_co'
+  client_schema: 'client_azure_co'
   use_synthetic_data: true
 
 models:
