@@ -34,3 +34,7 @@ sources:
       - name: shopify_inventory_items
       # Attribution (synthetic only — no is_synthetic filter needed)
       - name: synthetic_touchpoint_journey
+      # Shopify customers (for profile derivation)
+      - name: shopify_customers
+      # Klaviyo flow history (maps old flow_ids to new after account restructure)
+      - name: klaviyo_flow_id_history

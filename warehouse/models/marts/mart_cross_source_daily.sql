@@ -101,6 +101,48 @@ date_spine as (
     select distinct date from ga4
     union
     select distinct order_date from {{ ref('stg_shopify_orders') }}
+),
+
+-- Rank each customer's orders chronologically (cancelled orders excluded)
+customer_order_ranks as (
+    select
+        customer_id,
+        order_date,
+        row_number() over (partition by customer_id order by order_date, order_id) as order_rank
+    from {{ ref('stg_shopify_orders') }}
+    where not is_cancelled
+),
+
+-- Customer cohort table: first order date and second order date per customer
+customer_cohorts as (
+    select
+        customer_id,
+        min(case when order_rank = 1 then order_date end)                       as first_order_date,
+        min(case when order_rank = 2 then order_date end)                       as second_order_date
+    from customer_order_ranks
+    group by customer_id
+),
+
+-- Rolling 90-day repeat purchase rate per spine date
+-- Numerator: customers whose first order was in [date-90, date-1] AND have a second order <= date
+-- Denominator: all customers with first order in [date-90, date-1]
+-- Returns NULL when denominator = 0
+repeat_purchase as (
+    select
+        ds.date,
+        count(cc.customer_id) filter (
+            where cc.first_order_date >= ds.date - interval '90 days'
+              and cc.first_order_date <  ds.date
+              and cc.second_order_date is not null
+              and cc.second_order_date <= ds.date
+        )::numeric
+        / nullif(count(cc.customer_id) filter (
+            where cc.first_order_date >= ds.date - interval '90 days'
+              and cc.first_order_date <  ds.date
+        ), 0)                                                                   as rolling_repeat_purchase_rate_90d
+    from date_spine ds
+    cross join customer_cohorts cc
+    group by ds.date
 )
 
 select
@@ -151,6 +193,10 @@ select
     -- Returns
     coalesce(ret.return_count, 0)                                       as return_count,
     coalesce(ret.return_refund_total, 0)                                as return_refund_total,
+
+    -- Repeat Purchase Rate (rolling 90-day cohort — required for E2 alert)
+    -- NULL when fewer than 1 customer had a first order in the trailing 90 days
+    rp.rolling_repeat_purchase_rate_90d,
 
     -- ── Data Freshness — last sync timestamps ────────────────────────────────
     cc.last_shopify_sync                                                as shopify_last_synced_at,
@@ -203,4 +249,5 @@ left join ga4            ga  on ds.date = ga.date
 left join ga4_errors     ge  on ds.date = ge.date
 left join sentry         se  on ds.date = se.date
 left join returns        ret on ds.date = ret.date
+left join repeat_purchase rp on ds.date = rp.date
 order by ds.date desc
