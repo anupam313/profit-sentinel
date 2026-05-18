@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-05-18T13:55:02.372625+00:00",
+  "answers": {
+    "cogs_source": "shopify_cost_field",
+    "cogs_confidence_level": "medium",
+    "business_model_type": "seasonal",
+    "business_model_type_written_to_db": false,
+    "attribution_philosophy": "last_click",
+    "meta_attribution_window_written": "1d_click",
+    "roas_revenue_definition": "gross_excl_shipping",
+    "include_shipping_in_revenue": false,
+    "alert_sensitivity": "medium",
+    "scaled_thresholds": {
+      "return_rate_threshold_pp": 4.0,
+      "cpm_spike_threshold_pct": 20.0,
+      "margin_floor_pct": 5.0,
+      "ga4_funnel_drop_threshold": 8.0,
+      "sentry_error_threshold_pct": 2.0,
+      "gorgias_sentiment_threshold": 15.0,
+      "roas_drop_threshold_pct": 15.0,
+      "influencer_return_rate_threshold": 35.0,
+      "contribution_margin_drop_threshold": 5.0
+    }
+  },
+  "dbt_exit_code": 0,
+  "insight_sources": [
+    "Meta Ads",
+    "Shopify"
+  ]
+}
