@@ -105,7 +105,16 @@ select
     extract(month from c.date) = 12 and extract(day from c.date) <= 2   as is_bfcm_period,
 
     -- Meta attribution break (Jan 12 2026: 7d_view + 28d_view deprecated)
-    c.date >= date '2026-01-12'                                 as post_meta_attribution_break
+    c.date >= date '2026-01-12'                                 as post_meta_attribution_break,
+
+    -- ── Data Freshness (propagated from mart_cross_source_daily) ─────────────
+    -- Agent A checks any_source_stale and meta_data_stale before firing alerts.
+    -- If stale: suppress and write H1 to alert_log instead.
+    c.any_source_stale,
+    c.data_as_of,
+    c.meta_data_stale,
+    c.shopify_data_stale,
+    c.ga4_data_stale
 
 from cross_source c
 left join prior_year p on c.date = p.current_date_equiv::date

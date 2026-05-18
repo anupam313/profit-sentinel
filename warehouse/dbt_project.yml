@@ -17,7 +17,7 @@ clean-targets:
   - "dbt_packages"
 
 vars:
-  client_id: 'azure_co'
+  client_id: 'client_azure_co'
   use_synthetic_data: true
 
 models:

@@ -83,6 +83,20 @@ returns as (
     group by return_date
 ),
 
+config as (
+    select
+        last_shopify_sync,
+        last_meta_sync,
+        last_tiktok_sync,
+        last_klaviyo_sync,
+        last_gorgias_sync,
+        last_ga4_sync,
+        last_sentry_sync
+    from public.client_config
+    where client_id = '{{ var("client_id") }}'
+    limit 1
+),
+
 date_spine as (
     select distinct date from ga4
     union
@@ -135,9 +149,50 @@ select
 
     -- Returns
     coalesce(ret.return_count, 0)                                       as return_count,
-    coalesce(ret.return_refund_total, 0)                                as return_refund_total
+    coalesce(ret.return_refund_total, 0)                                as return_refund_total,
+
+    -- ── Data Freshness — last sync timestamps ────────────────────────────────
+    cc.last_shopify_sync                                                as shopify_last_synced_at,
+    cc.last_meta_sync                                                   as meta_last_synced_at,
+    cc.last_tiktok_sync                                                 as tiktok_last_synced_at,
+    cc.last_klaviyo_sync                                                as klaviyo_last_synced_at,
+    cc.last_gorgias_sync                                                as gorgias_last_synced_at,
+    cc.last_ga4_sync                                                    as ga4_last_synced_at,
+    cc.last_sentry_sync                                                 as sentry_last_synced_at,
+
+    -- ── Staleness flags — COALESCE false when sync timestamp is NULL (synthetic) ──
+    coalesce((now() - cc.last_shopify_sync) > interval '12 hours', false)   as shopify_data_stale,
+    coalesce((now() - cc.last_meta_sync)    > interval '48 hours', false)   as meta_data_stale,
+    coalesce((now() - cc.last_tiktok_sync)  > interval '48 hours', false)   as tiktok_data_stale,
+    coalesce((now() - cc.last_klaviyo_sync) > interval '12 hours', false)   as klaviyo_data_stale,
+    coalesce((now() - cc.last_gorgias_sync) > interval '12 hours', false)   as gorgias_data_stale,
+    coalesce((now() - cc.last_ga4_sync)     > interval '72 hours', false)   as ga4_data_stale,
+    coalesce((now() - cc.last_sentry_sync)  > interval  '2 hours', false)   as sentry_data_stale,
+
+    -- ── Rollup flag — true if any source is stale ────────────────────────────
+    (
+        coalesce((now() - cc.last_shopify_sync) > interval '12 hours', false) or
+        coalesce((now() - cc.last_meta_sync)    > interval '48 hours', false) or
+        coalesce((now() - cc.last_tiktok_sync)  > interval '48 hours', false) or
+        coalesce((now() - cc.last_klaviyo_sync) > interval '12 hours', false) or
+        coalesce((now() - cc.last_gorgias_sync) > interval '12 hours', false) or
+        coalesce((now() - cc.last_ga4_sync)     > interval '72 hours', false) or
+        coalesce((now() - cc.last_sentry_sync)  > interval  '2 hours', false)
+    )                                                                   as any_source_stale,
+
+    -- ── data_as_of — oldest sync timestamp = bottleneck source ───────────────
+    least(
+        cc.last_shopify_sync,
+        cc.last_meta_sync,
+        cc.last_tiktok_sync,
+        cc.last_klaviyo_sync,
+        cc.last_gorgias_sync,
+        cc.last_ga4_sync,
+        cc.last_sentry_sync
+    )                                                                   as data_as_of
 
 from date_spine ds
+cross join config cc
 left join revenue        r   on ds.date = r.date
 left join meta           m   on ds.date = m.date
 left join tiktok         t   on ds.date = t.date
