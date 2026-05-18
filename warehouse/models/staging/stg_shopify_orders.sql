@@ -1,5 +1,5 @@
 with orders as (
-    select * from {{ source('shopify', 'shopify_orders') }}
+    select * from {{ source('client_azure_co', 'shopify_orders') }}
 )
 
 select

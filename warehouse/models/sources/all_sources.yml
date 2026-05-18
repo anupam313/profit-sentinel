@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: client_azure_co
+    database: postgres
+    schema: client_azure_co
+    tables:
+      # Shopify (Airbyte-managed raw tables)
+      - name: shopify_orders
+      - name: shopify_order_refunds
+      - name: shopify_order_line_items
+      # Meta (Airbyte-managed, all columns as text)
+      - name: meta_ad_performance
+      # TikTok (Airbyte-managed)
+      - name: tiktok_ad_performance
+      # Klaviyo (Airbyte-managed)
+      - name: klaviyo_profiles
+      - name: klaviyo_email_events
+      # Gorgias (Airbyte-managed)
+      - name: gorgias_tickets
+      # GA4 (manually managed, has is_synthetic)
+      - name: ga4_sessions_daily
+      - name: ga4_funnel_daily
+      - name: ga4_checkout_errors
+      # Loop Returns (Airbyte-managed raw, no is_synthetic)
+      - name: loop_returns
+      - name: loop_return_line_items
+      # Sentry (manually managed, has is_synthetic)
+      - name: sentry_errors_daily
+      # Cost reference (public schema, manually managed)
+      - name: sku_cost_master

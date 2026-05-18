@@ -16,6 +16,10 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+vars:
+  client_id: 'azure_co'
+  use_synthetic_data: true
+
 models:
   profit_sentinel:
     staging:

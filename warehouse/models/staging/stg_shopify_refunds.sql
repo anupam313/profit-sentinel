@@ -1,5 +1,5 @@
 with refunds as (
-    select * from {{ source('shopify', 'shopify_order_refunds') }}
+    select * from {{ source('client_azure_co', 'shopify_order_refunds') }}
 )
 
 select

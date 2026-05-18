@@ -2,21 +2,46 @@ version: 2
 
 models:
   - name: mart_net_revenue_daily
-    description: "Daily net revenue. Primary table for Agent A threshold checks."
+    description: "Daily net revenue with returns. Primary revenue table for Agent A."
     columns:
       - name: order_date
-        tests:
-          - unique
-          - not_null
+        tests: [unique, not_null]
       - name: order_count
-        tests:
-          - not_null
+        tests: [not_null]
       - name: gross_revenue
-        tests:
-          - not_null
+        tests: [not_null]
       - name: net_revenue
-        tests:
-          - not_null
+        tests: [not_null]
       - name: data_completeness_pct
-        tests:
-          - not_null
+        tests: [not_null]
+
+  - name: mart_cross_source_daily
+    description: "All 8-source signals aggregated by date. Agent A cross-source scan."
+    columns:
+      - name: date
+        tests: [unique, not_null]
+      - name: gross_revenue
+        tests: [not_null]
+      - name: total_ad_spend
+        tests: [not_null]
+      - name: total_sessions
+        tests: [not_null]
+
+  - name: mart_return_rate_by_sku
+    description: "SKU-level return rate with cost estimates. Agent A product health scan."
+    columns:
+      - name: sku
+        tests: [unique, not_null]
+      - name: units_sold
+        tests: [not_null]
+      - name: return_rate_pct
+
+  - name: mart_causal_chain_daily
+    description: "Primary Agent A scan table. All signals + prior-year baseline + YoY indices."
+    columns:
+      - name: date
+        tests: [unique, not_null]
+      - name: gross_revenue
+        tests: [not_null]
+      - name: total_ad_spend
+        tests: [not_null]
