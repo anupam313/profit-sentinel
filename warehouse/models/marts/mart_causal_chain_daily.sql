@@ -77,6 +77,30 @@ loop_signals as (
         count(*) filter (where return_lag_segment = 'lifestyle_change')        as loop_lifestyle_change_count
     from {{ ref('stg_loop_returns') }}
     group by return_date
+),
+
+-- ── Contribution Margin (Agent A: D1 signal) ──────────────────────────────
+-- COGS proxy: net_revenue * 0.45 (using 55% blended gross margin for
+-- contemporary womenswear Azure & Co).
+-- TODO: pull blended_gross_margin_pct from public.client_config once that
+--       column is added to the schema (currently absent).
+contribution_margin as (
+    select
+        date,
+        case
+            when net_revenue > 0
+            then (net_revenue * 0.55 - total_ad_spend) / net_revenue * 100
+            else null
+        end                                                                      as contribution_margin_pct
+    from cross_source
+),
+
+contribution_margin_with_lag as (
+    select
+        date,
+        contribution_margin_pct,
+        lag(contribution_margin_pct, 7) over (order by date)                    as cm_prior_7d
+    from contribution_margin
 )
 
 select
@@ -137,6 +161,19 @@ select
     -- ── Loop Return Signals (Agent A: lifestyle_change segment) ───────────────
     coalesce(ls.loop_lifestyle_change_count, 0)                                 as loop_lifestyle_change_count,
 
+    -- ── Repeat Purchase Rate (Agent A: E2 signal) ─────────────────────────────
+    -- Sourced from mart_cross_source_daily via the cross_source CTE above.
+    -- NULL when fewer than 1 customer had a first order in the trailing 90 days.
+    c.rolling_repeat_purchase_rate_90d,
+
+    -- ── Contribution Margin (Agent A: D1 signal) ──────────────────────────────
+    cm.contribution_margin_pct,
+    case
+        when cm.cm_prior_7d is not null and cm.cm_prior_7d != 0
+        then (cm.contribution_margin_pct - cm.cm_prior_7d) / cm.cm_prior_7d * 100
+        else null
+    end                                                                          as contribution_margin_chg_pct,
+
     -- ── Prior Year Baseline (52-week rule) ───────────────────────────────────
     p.py_gross_revenue,
     p.py_net_revenue,
@@ -189,8 +226,9 @@ select
     c.ga4_data_stale
 
 from cross_source c
-left join prior_year    p   on c.date = p.current_date_equiv::date
-left join meta_rolling  mr  on c.date = mr.date
-left join sizing_rolling sr  on c.date = sr.date
-left join loop_signals  ls  on c.date = ls.date
+left join prior_year                 p   on c.date = p.current_date_equiv::date
+left join meta_rolling               mr  on c.date = mr.date
+left join sizing_rolling             sr  on c.date = sr.date
+left join loop_signals               ls  on c.date = ls.date
+left join contribution_margin_with_lag cm on c.date = cm.date
 order by c.date desc
