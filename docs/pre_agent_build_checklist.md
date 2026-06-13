@@ -1,54 +1,126 @@
 # Profit Sentinel — Pre-Agent Build Checklist
-*Last updated: 2026-05-18*
-*Purpose: Track all outstanding gaps that must be
-resolved before each agent build begins. Update
-status after every relevant session.*
+*Last updated: 2026-05-31 (D1 Gap 3 Principles 1–4 locked). B-11, B-7, B-8, B-9, B-10, B-4 COMPLETE. Build sequence: B-5 → B-1 → B-2 → Agent B. B-12 pending before beta. Google Ads hardening complete (5,137 rows, 9 new columns). cost_micros = raw micros / 1,000,000. Seed scripts live in connectors/ not tests/. CD-16 added: Agent D correlation-not-causation qualifier. D1 Gap 3 Principles 1–4 locked — see state_2026_05_31_d1_p1_p4.md. 2026-06-02 (D1 Gap 6 WIP): 2 dependencies CLOSED (mix-shift → D-GAP6-1, organic-viral → D-GAP6-2), return-rate component PARTIAL; D-16 → WIP; D-28/D-29/D-35 category edits; new rows D-GAP6-3…D-GAP6-7. No code or S-rule definitions changed this pass — all detector/S-rule/causal_graph.py work is ROUTED/BATCHED. 2026-06-04 (D1 Gap 6 — discount-depth/S19 PARTIAL): new rows D-GAP6-16…D-GAP6-23 (per-item discount staging; discount source decomposition; Shopify-Returns-API-primary ingestion + returns-vs-refunds; Loop returns/exchange staging + return-to-replacement link + two exchange paths; Gorgias NLP parser as core infra; parser accuracy gate D1-G12; sale-period channel + delivery-label ingestion as Horizon-2; orphaned margin_floor_pct removal). No code/S-rule edited — all batched post-H. 2026-06-08 (D1 Gap 6 residual pass — Tier-1 locks): D-12g magnitude → brand-relative; D-16 updated (operational-cost/S20 CLOSED, residual pass IN PROGRESS, Gap 6 still WIP); D-33 step-3 fulfilment revised; new rows D-GAP6-24 (fulfilment estimated driver retired), D-GAP6-25 (BAU pre-sale-ramp exclusion + onboarding two-pass backfill; detector held in state file Tier-2), D-GAP6-26 (structural-break magnitude brand-relative), D-GAP6-27 (operational-cost/S20 feed-only lock). No code/S-rule edited — all batched post-H. 2026-06-09 (mirror-sync — Gap 6 closeout/cogs_parked): D-16 status corrected to supersede the 2026-06-08 "residual pass IN PROGRESS / Gap 6 still WIP" framing — O-24a new-vs-returning split RETIRED; thin-baseline confidence + all-explained actionability gate + residual-band cutoffs BLOCKED on the COGS foundation (O-28); Gap 6 does NOT lock — PARKED behind O-28; build pivots D→C (C-series next). No code/S-rule edited.*
+*Purpose: Track all outstanding gaps that must be resolved before
+each agent build begins. Update status after every relevant session.
+This file lives in project knowledge AND the local state folder.*
 
 ---
 
 ## PRE-AGENT A GAPS
-Agent A reads mart_causal_chain_daily only.
-All items below must be complete before Step 9.
+Agent A reads `mart_causal_chain_daily` only.
+**ALL PRE-AGENT A ITEMS COMPLETE. Step 9 done. commit b44ae63.**
 
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
-| A-1 | stg_shopify_inventory_levels | COMPLETE ✓ | Required for G2/G3 |
-| A-2 | stg_shopify_inventory_items | COMPLETE ✓ | Required for G2/G3, D3 COGS |
-| A-3 | stg_synthetic_touchpoint_journey | COMPLETE ✓ | Required for A1, A4 |
-| A-4 | Staleness flags in mart_causal_chain_daily | COMPLETE ✓ | Commit c6c5818 |
-| A-5 | client_id var correct in dbt_project.yml | COMPLETE ✓ | Commit 2cad0e6 |
-| A-6 | generate_schema_name macro | COMPLETE ✓ | Commit 2cad0e6 |
-| A-7 | Step 7 validation matrix (37 alerts) | COMPLETE ✓ | 2026-05-18. 27 PASS, 6 PARTIAL, 4 FAIL (non-blocking). See step7_gaps below |
+| A-1 | stg_shopify_inventory_levels | COMPLETE ✓ | Commit 2b55600. 626 rows. zero_stock_rows = 0 (all in-stock — seed limitation, expected). |
+| A-2 | stg_shopify_inventory_items | COMPLETE ✓ | Commit 2b55600. 1 row — seed limitation. G2/G3 and D3 partial only. Not a blocker. |
+| A-3 | stg_synthetic_touchpoint_journey | COMPLETE ✓ | Commit 2b55600. 63,364 rows, 33,957 distinct order_ids = 40.3% of orders. Within 35–45% spec. |
+| A-4 | Staleness flags in mart_causal_chain_daily | COMPLETE ✓ | Commit c6c5818. any_source_stale, data_as_of, per-source stale flags all present. |
+| A-5 | client_id var correct in dbt_project.yml | COMPLETE ✓ | Commit 2cad0e6. client_id = 'client_azure_co'. |
+| A-6 | generate_schema_name macro | COMPLETE ✓ | Commit 2cad0e6. Staging → client_azure_co_staging. Marts → client_azure_co_marts. |
+| A-7 | Step 7 validation matrix (37 business alerts) | COMPLETE ✓ | Commit ffa128f. 27 full PASS, 6 partial, 4 fail (all non-blocking). Critical high-actionability alerts A1/A2/C1/C2/D1/F2/G1 all PASS or PARTIAL PASS. 10 sub-gaps documented below. |
+| A-8 | public_staging schema dropped | COMPLETE ✓ | Commit e56f954. Schema had 0 objects — dropped cleanly. |
 
-### Step 7 Gaps (found during validation — not blocking Agent A Step 8)
+### Step 7 Sub-Gaps — mart_causal_chain_daily Column Expansions
 
-| # | Gap | Impacts | Notes |
-|---|-----|---------|-------|
-| A-7a | `meta_cpm_change_pct`, `meta_roas_change_pct` not in mart | A2, B4 | Agent A must compute from stg_meta_ad_performance; staging proxy confirmed 68 ROAS-drop days, 109 CPM-spike days |
-| A-7b | `meta_ctr_7d_avg`, `meta_cpm_7d_avg` rolling cols not in mart | B1 | Alert seeded (13 rows); mart must expose these for Agent A threshold scan |
-| A-7c | `predicted_return_spike_risk`, sizing complaint cols not in mart | C1 | Alert5 seeded (8 rows); Agent A derives from stg_gorgias_tickets + stg_loop_returns |
-| A-7d | `contribution_margin_change_pct`, `using_prior_year_baseline` not in mart | D1, D6 | py_* columns present (366 days); Agent A computes proxy from py_gross_revenue |
-| A-7e | `loop_lifestyle_change_count`, `loop_fit_quality_count` not in mart | C7 | lifestyle keyword absent from stg_loop_returns.return_reasons; seed gap |
-| A-7f | `stg_klaviyo_profiles` staging view not built | E1–E4 | Raw table has 18,200 rows; staging model needed before E-series full validation |
-| A-7g | `unit_cost` NULL in stg_shopify_inventory_items | G2/G3, D3 | 1-row seed limitation; Shopify cost field not populated in seed |
-| A-7h | C4 seed: only 3 days return_count > 20 (spec: > 20 days) | C4 | Seed generates low peak returns; not blocking Agent A |
-| A-7i | D2 seed: discount_rate = 14.1% (spec: 20–50%) | D2 | Seed generates fewer discounted orders; not blocking Agent A |
-| A-7j | E repeat_purchase_rate = 1.000 (spec: 0.25–0.45) | E2 | All-time 24-month rate ≈ 1.0 for synthetic data; metric needs 90-day window definition |
+| # | Sub-Gap | Affected Alerts | Status | Notes |
+|---|---------|----------------|--------|-------|
+| A-7a | meta_cpm_change_pct missing from mart SELECT | A2, B4 | COMPLETE ✓ | Commit e56f954. Added via new meta_daily CTE. |
+| A-7b | meta_ctr_7d_avg and meta_ctr_prior_7d_avg missing from mart SELECT | B1 | COMPLETE ✓ | Commit e56f954. Added via new meta_rolling CTE. |
+| A-7c | sizing_complaint_rate_7d and sizing_complaint_velocity_pct missing from mart SELECT | C1 | COMPLETE ✓ | Commit e56f954. Added via sizing_daily and sizing_rolling CTEs. |
+| A-7d | using_prior_year_baseline missing from mart SELECT | D1, D6 | COMPLETE ✓ | Commit e56f954. Added to final SELECT. |
+| A-7e | loop_lifestyle_change_count = 0 on all mart rows | C7 | COMPLETE ✓ | Commit e56f954. FILTER case mismatch fixed. Now returns total=1598 across 635 days. |
+| A-7f | stg_klaviyo_profiles not built | E1, E2, E3, E4 | COMPLETE ✓ | Commit e56f954. 9,509 rows, 1,340 VIP. DEVIATION: sources from shopify_customers not Klaviyo raw — Airbyte pre-created table with JSONB. Rebuild required at real client onboarding. |
+| A-7g | unit_cost NULL in stg_shopify_inventory_items | D3, G2, G3 | DOCUMENTED | 1-row seed limitation. Real client data will populate. Non-blocking. |
+| A-7h | stg_klaviyo_flows not built | D5 | COMPLETE ✓ | Commit e56f954. 14 distinct flows, $188,719 revenue. 9 of 14 unnamed — seed metadata not persisted. |
+| A-7i | E repeat purchase rate definition gap | E2 | COMPLETE ✓ | Commit e56f954 (mart_cross_source_daily) + b44ae63 (joined into mart_causal_chain_daily). Range 0.00–0.78. |
+| A-7j | B5 Campaign Learning Phase not seeded | B5 | DOCUMENTED | Not seedable synthetically. Agent A checks for pattern — will fire on real client data. Non-blocking. |
+
+### Step 7 Full Results — Reference Table
+
+| Alert | Result | Key Signal | Notes |
+|-------|--------|-----------|-------|
+| A1 | PASS | signal_days 689, channel_gap 13.89 | blended_roas 16.07 vs tiktok 2.18 |
+| A2 | PASS | roas_drop_days 68, worst -40.3% | meta_cpm_change_pct gap (A-7a) |
+| A3 | PASS | tiktok_leads 99 / meta_leads 631 | post-break tiktok_leads 37 |
+| A4 | PASS | multi_touch_orders 25,447 | meta 20,951 / tiktok 19,695 touchpoints |
+| A5 | PASS | cac_computable_days 730 | avg blended CAC $18.26 |
+| A6 | PASS | return_adjusted_days 689 | avg_return_rate 3.07% (stored as %) |
+| B1 | PASS | 13 alert_log rows | CTR/CPM rolling cols gap (A-7b) |
+| B2 | PASS | meta_spend_share 0.79 | slightly above 0.70 archetype target |
+| B3 | PASS | impression_days 729 | avg 11,668 impressions/day |
+| B4 | PASS | cpm_spike_days 109 (proxy) | peak CPM change +93% |
+| B5 | PARTIAL | 0 alert_log rows | not seeded — non-blocking (A-7j) |
+| C1 | PASS | 8 Alert5 rows (4+4 stages) | sizing cols gap (A-7c) |
+| C2 | PASS | stage1=29 / stage2=28 | meets spec exactly |
+| C3 | PASS | outlier_sku_weeks 9, max 12.82% | brand avg 2.30% |
+| C4 | FAIL | high_return_days 3 (spec >20) | sparse peaks — non-blocking seed characteristic |
+| C5 | PASS | days_both_signal 689 | — |
+| C6 | PASS | skus_tracked 125, max 12.82% | — |
+| C7 | PARTIAL | lifestyle_return_days 0 | FILTER case mismatch fixed (A-7e) — now 1598 rows |
+| D1 | PASS | compression_days 30, py_days 366 | using_prior_year gap (A-7d) |
+| D2 | FAIL | discount_rate 0.141 (spec 0.20–0.50) | seed underseeded — non-blocking |
+| D3 | PARTIAL | sku_cost_rows 650, skus 125 | unit_cost NULL (A-7g) |
+| D4 | PASS | order_days 730 | — |
+| D5 | PARTIAL | 6 alert_log rows, 14 flows | stg_klaviyo_flows built (A-7h) — 9 flows unnamed |
+| D6 | PASS | prior_year_days 366, from 2025-05-31 | col not in mart SELECT (A-7d) |
+| E1–E4 | PARTIAL | 9,509 profile rows, 6 alert_log rows | stg_klaviyo_profiles built (A-7f) — shopify_customers source |
+| E-repeat | COMPLETE ✓ | rate 0.00–0.78, avg 0.45 | 90d rolling definition added (A-7i), b44ae63 |
+| F1/F5 | PASS | error_days 730, worst_rate 0.0805 | — |
+| F2 | PASS | 1 gateway alert (2025-02-20) | — |
+| F3 | PASS | ga4_days 706, avg 1,918 sessions | — |
+| F4 | PASS | sentry_days 730, peak 7,222 errors | — |
+| G1 | PARTIAL | 626 items, 3 alert rows seeded | deferred (B-4 ad set→SKU mapping) |
+| G2/G3 | PARTIAL | 1 inventory_item row | seed limitation (A-7g) |
+| G4 | PARTIAL | 0 alert_log rows | back-in-stock not seeded — non-blocking |
+
+**Overall: 27 full PASS / 6 PARTIAL / 4 FAIL (all non-blocking)**
+**Critical high-actionability alerts (A1, A2, C1, C2, D1, F2, G1): ALL PASS or PARTIAL PASS**
+
+### Agent A Test Results (Step 9)
+
+| Test | Date | Result |
+|------|------|--------|
+| Test 1 | 2025-10-15 | alerts_written: 2 (C1, A1). Deduplication correct on second run. |
+| Test 2 | 2025-03-01 | alerts_written: 2 (C1, A1). C1 fires on quiet date — threshold calibration needed. |
+| Test 3 | 2026-05-19 | alerts_written: 1 (A1). Mart has data through today. |
+| Test 4 | 2026-01-15 | alerts_written: 1 (A1). attribution_break_caveat: [] correct (A2/B4 not fired). |
+| Bonus | 2025-06-30 | alerts_written: 2 (A1, E2). E2 fired: RPR 0.50 vs baseline 0.71. |
+
+### Known Threshold Issues — Fix Before First Real Client
+
+| # | Issue | Action Required |
+|---|-------|----------------|
+| T-1 | C1 fires on quiet dates (gorgias_sentiment_threshold = 15% too low) | COMPLETE ✓ — Set to 43.61 (p90). Fires on 9.9% of synthetic dates. Per-client recalibration required at onboarding (see CD-10). |
+| T-2 | D1 never fires (margin_floor_pct = 5% — far too low for womenswear) | COMPLETE ✓ — margin_floor_pct = 28.0, contribution_margin_drop_threshold = 10.0. D1 fires on 3/730 synthetic dates. Production floor correct for real client. |
+| T-3 | B4 CPM spike threshold (20%) not reached by synthetic data (peak 9%) | Threshold likely correct. Will fire on real client data. Monitor. |
 
 ---
 
 ## PRE-AGENT B GAPS
 Agent B traverses Fashion Causal Graph and reads
-causal_pattern_validation. All items below must be
+`causal_pattern_validation`. All items below must be
 complete before Agent B build begins.
 
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
-| B-1 | causal_pattern_validation seed rows | PENDING | Zero rows currently. Need Archetype A validated chains seeded before Agent B build |
-| B-2 | candidate_signals seed rows | PENDING | Zero rows. Agent B logs unrecognised patterns here — needs at least schema validation |
-| B-3 | Verification category assigned all 37 alerts | COMPLETE ✓ | Written to product_strategy.md Section 3A |
-| B-4 | G1 ad set → SKU mapping decision | PENDING | Architectural gap. Two options: manual mapping table OR infer from ad set naming convention. Must decide before Agent B traverses inventory causal chain |
-| B-5 | Fashion Causal Graph defined in code | PENDING | Graph exists conceptually in Blueprint. Needs Python/JSON representation for Agent B to traverse |
+| D-12 | historical_pattern_scan.py | COMPLETE ✓ | Built and executed 2026-05-20. --mode full. All 5 checks pass: historical_scan_status=complete, 22 rows in causal_pattern_validation (1 core / 1 provisional / 20 candidate), 440 novel pairs in candidate_signals, 7 DQ rows, 1 onboarding_messages row (forward_promise variant). GMV derived $6,818,827.73. |
+| D-21 | GMV derivation from Shopify at onboarding scan | COMPLETE ✓ | Implemented in Phase 4 of historical_pattern_scan.py. Writes gmv_derived_annual + gmv_derived_at to client_config on every full and incremental run. Synthetic result: $6,818,827.73. |
+| B-1 | causal_pattern_validation seed rows | PENDING | 22 rows written by historical_pattern_scan.py. Need remaining 34 of 56 hardcoded chains seeded. Avoid duplicates on causal_chain_id + vertical_tag unique constraint. Design B-5 (Fashion Causal Graph) first — chain list required before seeding. |
+| B-2 | candidate_signals seed rows | PENDING | 440 rows written by historical_pattern_scan.py. Schema and promotion logic validated. Confirm whether additional seed rows needed before Agent B build. |
+| B-3 | Verification category assigned all 37 alerts | COMPLETE ✓ | Written to product_strategy.md Section 3A (May 2026). A/B/C classification complete for all 56 alert codes. |
+| B-4 | SKU-to-ad attribution via content_ids | COMPLETE ✓ 2026-05-22 | content_ids from Meta/TikTok Purchase/CompletePayment events. Google Shopping: product_id from feed. campaign_objective in all 3 ad platform seeds — gates ROAS (AWARENESS = NULL). 5 seed scripts updated (meta, tiktok, google_ads, gorgias, stg_loop_returns). 1 new mart column: campaign_sku_return_rate_7d. Three-source chain verified: Gorgias sizing_issue → Shopify order → Loop return (same customer_email). HERO_DRESS BFCM return rate: 34–38% vs 18–22% brand avg. All 8 cross-source chain checks PASS. dbt PASS=65 WARN=0 ERROR=0. Dropped permanently: ROAS < 1.0 pause recommendation, upper-funnel organic lift correlation. |
+| B-5 | Fashion Causal Graph in code (`agents/causal_graph.py`) | PENDING — designed ✓, not yet built | Architecture locked: hardcoded structured dict (Interpretation A), permanently not DAG. One entry per chain with: causal_chain_id, leading_signal_column, leading_signal_direction, outcome_column, outcome_direction, lag_days, corroborating_signals[], mart_table, status (active / active_proxy / mart_column_missing), routing (null for A-G, internal/informational/founder_action_required for H-series), verification_category. Full 56-chain column mapping complete — see chat_context_2026_05_21_b5_design.md Decision 7. Blocked on: B-9 (new mart columns) and B-10 (mart_customer_segments_daily) being built first. |
+| B-6 | promotion_threshold values finalised | PENDING | Open decision per product_strategy.md Section 12. How many validated instances (per-client and cross-network) required before candidate signal promotes. |
+| B-12 | Real-data hardening — Google Ads + cross-source timing | PENDING — before beta | Six gaps identified 2026-05-21: (1) ±1 day tolerance on all cross-source date joins, (2) data_lag_hours field in client_config per source, (3) attribution window permanent DQ limitation entries (Google last-click / Meta 7d-click-1d-view), (4) PMAX_DIAGNOSTIC_BLOCKED permanent DQ limitation, (5) cost_micros rounding — NOT a mart SQL fix (PostgreSQL exact arithmetic means no divergence in DB). Fix is Agent D disclosure only: add to Evidence Stack Layer 0 for all G-series spend alerts: "Google Ads spend figures may differ from your dashboard by <$0.50/day due to ad-set level rounding in Google's reporting layer." Seed 30 split rows are in DB as structural demonstration only. (6) campaign_type not campaign_name in all Agent D founder-facing text. Must complete before first beta client onboards. |
+| B-7 | Google Ads synthetic seed | COMPLETE ✓ 2026-05-21 | Phase 1 connector confirmed May 21 2026. Seed required before G-series mart columns testable. Campaigns to seed: Search, Shopping, PMax, YouTube, Discovery/Demand Gen. Exclude Display. Fields: spend, impressions, clicks, ctr, campaign_id, ad_group_id, attributed_conversions, attributed_revenue, average_cpc, search_impression_share (campaign level only for PMax), conversion_value_per_cost, campaign_type, quality_score. PREREQUISITE: Read Google Ads API v17 documentation before writing seed script. Confirm exact field names — PMax has specific reporting limitations vs standard campaigns. |
+| B-8 | `sku_cost_master` full seeding | COMPLETE ✓ 2026-05-21 | Currently 1-row seed limitation. Required for G-series mart columns (G2, G3 use cost for inventory value calculation) and D3 testing (COGS step-change). Seed all ~380 active variant SKUs with realistic cost, effective dates, and at least one cost step-change event. |
+| B-9 | 12 new mart columns in `mart_causal_chain_daily` | COMPLETE ✓ 2026-05-21 | New columns required for B-5 chain mapping. Full spec in chat_context_2026_05_21_b5_design.md Decision 3. Columns: discount_order_rate_90d, top_creative_spend_pct_by_objective (JSONB by objective), advantage_plus_spend_pct, repeat_customer_return_rate_7d, new_customer_return_rate_7d, stockout_sku_count, stockout_with_active_spend_count (includes Google Ads spend — B-7 prerequisite), avg_days_inventory_on_hand (zero-velocity=999 not NULL), sell_through_rate_7d, top_sku_inventory_pct, top_sku_inventory_units_pct, back_in_stock_waitlist_count. Note: client_config ALTER TABLE (B-11) must run before this build. Note: stockout_with_active_spend_count requires B-7 (Google Ads seed) to be complete first. |
+| B-10 | `mart_customer_segments_daily` — new mart model | COMPLETE ✓ 2026-05-22 | 2,920 rows (730 × 4 segments). Segments: explorer/regular/loyalist/advocate. Boundaries read from client_config. segment_avg_roas = NULL by design (requires B-4). segment_calibration_status = calibrated. dbt PASS=23/65 tests. KNOWN LIMITATION: Explorer segment_pct_of_total_revenue = 0% on synthetic dates (trailing 90d window artifact — real client data will populate correctly). Agent B must not fire on Explorer revenue share = 0% without checking new customer acquisition in trailing 90 days. |
+| B-11 | `client_config` ALTER TABLE — 8 columns (6 segment + google_ads_connected + last_google_ads_sync) | COMPLETE ✓ 2026-05-21 | Required before mart_customer_segments_daily can be built. SQL: ALTER TABLE public.client_config ADD COLUMN IF NOT EXISTS repeat_customer_order_minimum integer default 2, ADD COLUMN IF NOT EXISTS explorer_max_orders integer default 1, ADD COLUMN IF NOT EXISTS regular_max_orders integer default 3, ADD COLUMN IF NOT EXISTS loyalist_max_orders integer default 6, ADD COLUMN IF NOT EXISTS advocate_min_orders integer default 7, ADD COLUMN IF NOT EXISTS segment_significance_min_revenue_pct numeric default 2.0; |
+| B-7 | stg_klaviyo_profiles verified for real client | PENDING | Currently sources from shopify_customers (seed limitation). Must rebuild from actual Klaviyo raw table at real client onboarding. Also verify sunset_eligible derivation (requires email events join). |
+| B-8 | stg_klaviyo_flows flow names resolved | PENDING | 9 of 14 flows unnamed. Resolve at real client onboarding when Klaviyo API returns flow metadata. |
+| B-9 | mart_causal_chain_daily D1 columns | COMPLETE ✓ | Commit b44ae63. contribution_margin_pct (range 32.85–52.91%) and contribution_margin_chg_pct (723/730 rows populated) added. Note: blended_gross_margin_pct hardcoded at 55% — TODO to pull from client_config. |
 
 ---
 
@@ -58,12 +130,36 @@ Agent D formats Evidence Stack and posts to Slack.
 
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
-| CD-1 | Slack personal workspace created | PENDING | Step 10 |
-| CD-2 | Evidence Stack message format defined | PENDING | Step 10 |
-| CD-3 | Approve/Snooze/Dismiss button wiring | PENDING | Step 10 |
-| CD-4 | sku_cost_master populated | PENDING | Required for D1/D3 action recommendations with accurate margin impact |
-| CD-5 | permanent_dq_limitations rows seeded | PENDING | Required for Layer 0 Evidence Stack disclosures |
-| CD-6 | suppression_log schema validated | PENDING | Agent D reads this for "why no alert" queries |
+| CD-1 | Slack personal workspace created | COMPLETE ✓ | Profit Sentinel Dev workspace created. Bot app installed with all 7 scopes. Socket Mode enabled. Step 10 done 2026-05-19. |
+| CD-2 | Evidence Stack message format defined | COMPLETE ✓ | 7-block Block Kit formatter built (alert_formatter.py). Header, context, confidence, divider, evidence stack, divider, actions. projected_impact block skipped — column absent from live schema. evidence_stack_json used (not evidence_stack). |
+| CD-3 | Approve/Snooze/Dismiss button wiring | COMPLETE ✓ | All three action paths write correctly to alert_log. Approve/Snooze write action_taken + action_taken_at. Dismiss writes action_taken + dismissal_reason via 2-step thread flow. suppressed unchanged on snooze — confirmed. |
+| CD-4 | sku_cost_master populated | PENDING | Required for D1/D3 action recommendations with accurate margin impact. Tier 2 path: derive from stg_shopify_inventory_items.cost + landed_cost_multiplier (1.28). |
+| CD-5 | permanent_dq_limitations rows seeded | PENDING | Required for Layer 0 Evidence Stack disclosures. Table exists, zero rows. |
+| CD-6 | suppression_log schema validated | PENDING | Agent D reads this for "why no alert" queries. Table DDL exists — confirm live table created in Supabase. |
+| CD-7 | brand_event_calendar populated | PENDING | Drives all suppression logic in Agent A and Agent D context explanations. Table created by Agent A build — needs seed rows for Azure & Co events. |
+| CD-8 | alert_data_lineage table confirmed live | PENDING | Required for Evidence Stack Layer 2 verifiable proof. Table DDL exists — confirm created in Supabase. |
+| CD-9 | dq_metric_scores table confirmed live | PENDING | Required for Layer 0 DQ score display. Table DDL exists — confirm created. |
+| CD-10 | Per-client C1 threshold calibration at onboarding | PENDING | gorgias_sentiment_threshold set to p90 on synthetic data (43.61) — fires at 9.9% of dates. At real client onboarding: run sizing_complaint_velocity_pct distribution query across all mart dates, recalibrate to hit 15–25% firing rate. If p75 produces 150–200 firing dates use p90. Add as post-confirmation calibration step in onboarding_flow.py. |
+| CD-11 | Slack button UI polish — disable buttons post-click | Pre-beta client | Action buttons remain active after click — founder will assume click did not register. Handler must update original message to replace actions block with plain text confirmation after any button click. Not a functional bug — DB writes correctly. Fix before first beta client. |
+| CD-12 | /sentinel-test slash command verification | PENDING | app.py Socket Mode confirmed working. /sentinel-test not yet tested. Verify before Agent C build. |
+| CD-13 | NLQ (Natural Language Query) — pilot launch feature | PENDING — design in Agent D session | Parallel workstream to Agent D (Step 13). Reuses LLM formatting layer. Scope: (1) Free-text → SQL translation over mart/staging tables. (2) Cross-source queries first-class — mart_cross_source_daily supports multi-source SKU-level queries no single-source tool can answer. (3) Ambiguity resolution — partial SKU/campaign name match returns candidates, single follow-up to confirm before querying. (4) Output format flexibility — table, CSV, prose, inline chart — detected from question or explicit request. (5) Scope guard — if connector missing, explain and offer fallback. (6) Inline alert surfacing — if NLQ answer crosses alert threshold, surface relevant alert inline. (7) Historical depth disclaimer on day 1 until historical_pattern_scan.py completes. Architecture spec defined in Agent D design session. |
+| CD-14 | Agent D display rule: avg_days_inventory_on_hand = 999 | PENDING — carry into Agent D build session | When avg_days_inventory_on_hand = 999 for any SKU, display in Evidence Stack as "zero-velocity SKU — likely overstock or discontinued." Never display raw value 999 to founder. This applies in all G-series alert Evidence Stack outputs. |
+| CD-15 | H-series routing in Agent D | PENDING — carry into Agent D build session | H-series alerts have three routing values defined in causal_graph.py. Agent D must implement three distinct output formats: (1) internal — post to PS internal Slack only, never founder-facing unless outage persists beyond one sync cycle. Founder message on persistent failure: "We've detected an issue with your data pipeline. We're working on it and will update you once it's resolved." Resolution message: "Your data pipeline is back to normal. All alerts are live again." (2) informational — brief contextual message to founder, not an alert. No action required framing. (3) founder_action_required — missed opportunity framing, not error framing. Example: "Your Gorgias tagging rate dropped 40% this week — I can no longer reliably predict return spikes from complaint data. Worth a 5-minute fix." Full routing classification table in chat_context_2026_05_21_b5_design.md Decision 5. |
+| CD-16 | Agent D correlation-not-causation qualifier | PENDING — carry into Agent D build session | Agent D must NEVER say "caused by" when the mechanism is observational or correlational. Always "correlated with." This applies to ALL cross-source alerts where the pathway from signal A to outcome B is not mechanistic. Currently has no active alert application (the two signals it was attached to were dropped 2026-05-22). Re-apply to any future alert that makes a cross-source correlation claim without a confirmed causal mechanism. Implementation: add as a validation rule in Agent D's output formatting layer — any alert message containing "caused by" must be flagged and rewritten. |
+
+---
+
+## PRE-FIRST-CLIENT GAPS (Session 3 additions)
+
+Items discovered during mart patch session (2026-05-19 Session 3).
+Must resolve before first real client onboards.
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| S3-P1 | GA4 mart columns — pdp_bounce_rate and mobile/desktop checkout completion rates | PENDING — pre-first-client | GA4 device and pages tables absent in synthetic data. Columns exist in mart with NULL values and TODO comments. At first real client onboarding: verify ga4_pages and ga4_devices table names and actual column names from Airbyte GA4 schema. Update CTEs to match. |
+| S3-P2 | Klaviyo time-series columns sparse (32 rows) | Validate at first client onboarding | effective_open_rate_7d, send_frequency_7d, post_purchase_flow_revenue_7d have data only on 32 Klaviyo batch dispatch dates in synthetic seed. No mart change needed — confirm dense population at first real client onboarding. |
+| S3-P3 | stg_klaviyo_profiles column names differ from spec | PENDING — before Agent B build | Actual columns: profile_id (not customer_id), vip_status (not is_vip). Any future mart model or agent code joining stg_klaviyo_profiles must use these actual names. Added to schema drift carry-forward. |
+| S3-P4 | stg_meta_ad_performance has no attributed_revenue column | PENDING — pre-first-client | Current proxy: spend × purchase_roas. Acceptable for mart. At first real Meta connection: confirm actual attribution column name and update mart CTE if a dedicated column exists. |
 
 ---
 
@@ -71,13 +167,223 @@ Agent D formats Evidence Stack and posts to Slack.
 
 | # | Item | Deferred To | Notes |
 |---|------|-------------|-------|
-| D-1 | mart_inventory_spend_daily (SKU-level) | Agent A Step 9 design | G1 full validation needs this. Build after Agent A query pattern is defined |
-| D-2 | G4 back-in-stock Klaviyo waitlist | Agent A Step 9 | Needs Klaviyo waitlist flag confirmed in staging |
-| D-3 | network_pattern_benchmarks rows | Step 7 (Archetype B/D) | Archetype A vertical_tag staged. B/D thin datasets deferred |
-| D-4 | causal_pattern_validation cross-client rows | Month 6+ | Needs real client outcome data |
+| D-1 | mart_inventory_spend_daily (SKU-level) | Agent B design | G1 full validation needs SKU-level join between inventory and paid spend. Build after Agent B query pattern defined. |
+| D-2 | G4 back-in-stock Klaviyo waitlist flag | Agent B design | Needs Klaviyo waitlist flag in stg_klaviyo_profiles. G4 partial until resolved. |
+| D-3 | network_pattern_benchmarks rows | Archetype B+D seeding | Archetype A vertical_tag staged. Benchmark rows empty. B and D thin datasets deferred. |
+| D-4 | causal_pattern_validation cross-client rows | Month 6+ | Needs real client outcome data. Cannot be meaningfully seeded without validated instances. |
+| D-5 | mart_influencer_roi.sql dedicated mart | Agent B design | Influencer ROI via mart_return_rate_by_sku + alert_log for now. Evaluate at Agent B design session. |
+| D-6 | G1 ad set → SKU mapping table | Agent B design | Decision B-4 must be made first. |
+| D-7 | B5 Campaign Learning Phase seed rows | Real client data | Not seedable synthetically. Agent A checks for pattern — will fire on real client data. |
+| D-8 | C4 return peak density | Seed improvement | high_return_days = 3 vs spec >20. Non-blocking. Revisit if Agent A false negative rate is high on C4. |
+| D-9 | D2 discount rate (14.1% vs 20–50% spec) | Seed improvement | Seed underseeded discounts. Non-blocking. Revisit if D2 alert never fires in Agent A testing. |
+| D-10 | business_model_type column in client_config | Pre-first client | Onboarding answer in onboarding_log.json only. Add ALTER TABLE + update onboarding_flow.py before real client onboards. |
+| D-11 | blended_gross_margin_pct in client_config | COMPLETE ✓ | Column added, mart reads from client_config via subquery, onboarding_flow.py updated with Q1b (validation 0.20–0.85). azure_co = 0.55. Item 6 done 2026-05-19. |
+| D-12 | historical_pattern_scan.py | **Pre-first-client. Pre-Agent B.** | SCOPE FULLY LOCKED May 2026 (Q1–Q6 all resolved). Two run modes: (1) Full sweep — async, Step 6 of onboarding, silent completion, no founder-facing message. (2) Monthly incremental — scheduled 1st of month, incremental window since last_historical_scan_at, new novel pairs validated against full history before storing. Known chain validation (56 chains) and novel chain discovery are SEPARATE CODE PATHS — no merging at any stage. Known chains: all 56 scanned, observable_instance_count + hit_rate computed using binary hit definition (both leading signal AND outcome cross live-agent thresholds within lag ± 2 days), confidence_tier written to causal_pattern_validation with historical_scan_seeded=true. Novel chains: unconstrained bivariate sweep, sparsity filter (≥4 leading signal threshold-crossings), all candidates to candidate_signals with source='historical_scan', nothing auto-promotes. Per-source DQ pre-checks run before scan — results to dq_metric_scores, skipped chains get scan_skipped_reason on causal_pattern_validation. Pair matching: exact string match on leading_signal_column + outcome_column. Monthly post-sweep auto-check: cross_client_instance_count ≥ 3 AND calendar_clustered=false → promotion_status='validated' → practitioner review queue. client_specific=false set only after re-scan confirms post-approval. Track 1 global promotion deferred to post-10-client (DEBT-T1/D-19). Novel chains vertical-specific permanently — no cross-vertical promotion. Multi-vertical clients: separate causal_pattern_validation rows per vertical_tag (CD-4 hard dependency). Headline lookback: deepest single source (Shopify/Klaviyo anchor). GMV derived from Shopify for $ leakage threshold (≥1% GMV, 2+ patterns). Onboarding completion message: two variants ($ threshold crossed / not crossed). Pending connectors question added to confirmation flow (D-20). |
+| D-13 | Quarterly Shopify App Extensions monitoring | Ongoing operational | Calendar reminder each quarter. Check https://shopify.dev/docs/apps/build/app-extensions for Sidekick capability changes. |
+| D-14 | Platform break auto-detection (Layers 1–3) | Layer 1: pre-Agent B patch. Layer 2+3: pre-first client | Layer 1: extend schema_discovery.py to auto-create brand_event_calendar rows on column disappearance, step-change in metric distribution, or null rate spike. Layer 2: daily changelog monitor script (connectors/platform_monitor.py) — fetches Meta/Klaviyo/Shopify/GA4/TikTok/Gorgias changelogs, uses Claude API to classify impact, drafts brand_event_calendar rows with requires_review=true. Layer 3: mart_metric_stability.sql dbt model — 30-day rolling mean/stddev per key metric, flags >3σ moves not explained by calendar events, writes to candidate_signals as structural_break_candidate. Layer 4 (cross-client correlation) deferred to Month 6+. Replaces hardcoded Meta Jan 12 caveat in agent_a.py. |
+| D-15 | Recipe C CVR join logic — counter-intuitive result | COMPLETE ✓ | ga4 CTE in mart_cross_source_daily.sql fixed. Replaced AVG(overall_cvr) with SUM(purchase_completed)::numeric / NULLIF(SUM(sessions), 0). Eliminates grain fan-out distortion and funnel mismatch. avg_cvr now 0.00–1.00 ratio. dbt PASS=22. Direction logically consistent on real client data. Note: 20% co-movement on synthetic dates is seed artefact (purchase_completed and error series seeded independently) — recheck on first real client; if >10% co-movement persists, tighten err_chg threshold above 5% or add absolute count gate. |
+| D-16 | Network-adjusted lag windows in network_pattern_benchmarks | Before network reaches 10 clients | historical_pattern_scan.py launches with practitioner-informed default lag windows. As real client data accumulates, per-client effective_lag_days writes to causal_pattern_validation via outcome tracking. D-16 adds the cross-network layer: add median_lag_days + lag_sample_size columns to network_pattern_benchmarks, populated by a background aggregation query after each new client onboards (reads effective_lag_days grouped by causal_chain_id + vertical_tag). Network median then replaces practitioner prior for new client onboarding scans once sample size ≥ 5 clients same vertical_tag. Schema change: ALTER TABLE public.network_pattern_benchmarks ADD COLUMN median_lag_days numeric, ADD COLUMN lag_sample_size integer. Dependencies: (1) vertical_tag accurate on all clients — no cross-vertical pooling, (2) effective_lag_days being written correctly by outcome tracking — confirm live before D-16 build. |
+| D-17 | Single-client core promotion track + novel chain review infrastructure | Pre-Agent B | Three pre-filters before practitioner review: (1) Calendar dispersion check — calendar_clustered flag in candidate_signals, (2) Cross-client convergence fast-track — 3+ clients same vertical, calendar_clustered=false (deferred to post-10-client per DEBT-T1/D-19), (3) Effect size minimum — outcome must move ≥50% of live-agent threshold. Two promotion tracks: Track 1 (deferred — DEBT-T1) and Track 2 (single_client_core=true → practitioner_approved=true → core behaviour for that client only, client_specific=true permanently). client_specific=false set only after re-scan confirms post-approval. Pair matching: exact string match on leading_signal_column + outcome_column. Schema additions to candidate_signals: calendar_clustered, confound_unresolved, seasonal_confound_risk, single_client_core, practitioner_approved, leading_signal_column, outcome_column, observable_instance_count, hit_rate. Schema additions to causal_pattern_validation: observable_instance_count, threshold_at_scan_time, scan_skipped_reason. Schema additions to client_config: last_historical_scan_at, historical_scan_status, pending_connectors, pending_connectors_noted_at, gmv_derived_annual, gmv_derived_at. |
+| D-18 | Monthly practitioner digest — internal Slack | Post 5 beta clients | Internal Slack message (not founder-facing) summarising novel signal shortlist for practitioner review after monthly incremental sweep. Target <10 items/month after pre-filtering. Each card: leading signal, outcome, instances, hit rate, calendar_clustered status, effect size, clients showing this, 3-button response (✅ Validate / ❌ Reject / ⏳ Watch). Requires Agent D secondary output mode (internal digest format distinct from founder-facing Evidence Stack). Manual DB review acceptable for first 5 beta clients — do not build until volume justifies it. |
+| D-19 | DEBT-T1: Track 1 cross-client convergence threshold re-evaluation | Post 10 beta clients | Track 1 global promotion threshold (currently 3 clients) is provisional. Re-evaluate with real cross-client signal data at 10+ clients. Review: (1) is 3 clients the right threshold? (2) should per-client hit rate floor be added before triggering practitioner review? (3) adjust monthly auto-check threshold accordingly. Do not revisit before 10 clients — insufficient data. |
+| D-20 | Pending connectors question in onboarding confirmation flow | Pre-first-client | Add to end of existing 5-question confirmation flow: "Are you planning to connect any additional sources in the next 90 days?" — yes/no with free-text for which sources. Writes to client_config.pending_connectors (text[]) and pending_connectors_noted_at (timestamptz). Monthly incremental scan checks this flag: if pending connector now active → re-runs scan_skipped_reason chains for that connector → internal notification only (not founder-facing). |
+| D-21 | GMV derivation from Shopify at onboarding scan | Pre-first-client | historical_pattern_scan.py derives annual GMV from total Shopify order revenue in scan window. Writes to client_config.gmv_derived_annual and gmv_derived_at. Used by onboarding completion message to apply $ leakage threshold (≥1% of GMV AND 2+ patterns required to show $ section). Updated on every monthly incremental scan. No founder question — derived only. |
+| D-22 | Gorgias NLP classifier for ticket body return reason extraction | Discovery-gated | Do not build until customer discovery confirms: (a) founders trust sizing complaints predict return spikes, AND (b) Gorgias tagging is unreliable across 3+ beta clients. Scope when built: classify ticket bodies for all return reasons (sizing/fit, quality/defect, wrong item, changed mind, price, damaged in transit, description mismatch) — not sizing only. This is a full NLP pipeline with fashion-domain tuning, not a lightweight addition (est. 2–3 weeks build + ongoing maintenance). Until built: rely on Gorgias tags with DQ pre-check (tag coverage rate, vocabulary size, compound tag presence, return/sizing tag rate vs Loop return rate, agent tagging variance). |
+| D-23 | Discovery interview probe — Google Ads YouTube spend % | Pre-beta client | Add to subsequent discovery interviews: "What percentage of your Google spend goes to YouTube vs Search vs Shopping?" If consistently <5% YouTube across 5+ interviews, deprioritise YouTube in seed and mart columns. Currently included in B-7 seed spec based on practitioner judgment (~10–20% of Google budget at $2M–$10M GMV). Validate before building YouTube-specific mart columns. |
+| D-24 | back-in-stock Klaviyo flow onboarding check | Pre-first-client | At onboarding scan: check whether active back-in-stock Klaviyo flow exists for client. If absent, queue one-time missed-opportunity message in onboarding completion flow (not in live alert stream): "You have no back-in-stock flow set up in Klaviyo. Brands at your GMV tier typically recover significant revenue per restock event from waitlist customers. This takes 20 minutes to configure." Do not repeat after onboarding. Do not fire as a recurring alert. |
 
 ---
 
-*Update this file at the end of every session that
-resolves or adds a gap. Do not let gaps accumulate
-undocumented.*
+## COMPLETED ITEMS (FULL HISTORY)
+
+| Date | Item | Commit | Notes |
+|------|------|--------|-------|
+| 2026-05-22 | B-4 — SKU-to-ad attribution via content_ids | — | 5 seed scripts updated. 1 new mart column: campaign_sku_return_rate_7d. All 8 cross-source chain checks PASS. Three-source chain (Gorgias → Shopify → Loop, same customer_email) verified. HERO_DRESS BFCM return rate 34–38% vs 18–22% brand avg. dbt PASS=65 WARN=0 ERROR=0. top_sku_inventory_pct blocker resolved. Dropped permanently: ROAS < 1.0 pause, upper-funnel organic lift correlation. |
+| 2026-05-22 | Google Ads seed hardening (B-9 follow-on) | — | 9 new columns. 5,137 rows (updated from 5,117). 30 cost_micros split rows (structural demo). All 6 hardening checks pass. |
+| 2026-05-22 | B-10 — mart_customer_segments_daily | — | 2,920 rows (730 × 4 segments). All 8 checks pass. segment_calibration_status = calibrated. Explorer 0% revenue = synthetic artifact (documented). dbt PASS=65. |
+| 2026-05-21 | B-5 design — Fashion Causal Graph architecture locked | — | Hardcoded registry (Interpretation A) confirmed permanently. 56-chain column mapping complete against live mart column list. 12 new mart columns specified. mart_customer_segments_daily model specified. H-series routing classification locked (3 categories). Google Ads Phase 1 confirmed with full seed spec. client_config ALTER TABLE requirements (6 segment columns) specified. All decisions in chat_context_2026_05_21_b5_design.md. |
+| 2026-05-21 | B-11 — client_config ALTER TABLE (8 columns) | — | 6 segment columns + google_ads_connected + last_google_ads_sync. All defaults confirmed. google_ads_connected set true for client_azure_co. |
+| 2026-05-21 | B-7 — Google Ads synthetic seed | — | 5,117 rows. 7 campaigns. API v24.1 confirmed. PMax carve-outs applied. 14-day Shopping pause Jul 15–28 2025. cost_micros = raw micros. File: connectors/seed_google_ads.py |
+| 2026-05-21 | B-8 — sku_cost_master full reseed | — | 428 rows (420 sku_cogs + 8 gifting). 380 active SKUs. 40 HERO DRESS step-change pairs (effective_from 2025-09-01) for D3 testing. File: connectors/seed_sku_cost_master.py |
+| 2026-05-21 | B-9 — 12 new mart columns in mart_causal_chain_daily | — | dbt green. 730 rows. All 12 columns present. Inventory columns 6–11 point-in-time only (single snapshot 2026-05-31). top_sku_inventory_pct NULL pending B-4 alias map. stg_loop_returns uses return_date not created_at. |
+| 2026-05-20 | D-12 — historical_pattern_scan.py built and executed | — | --mode full complete. 22 chains in causal_pattern_validation (1 core / 1 provisional / 20 candidate). 440 novel pairs in candidate_signals (80 single_client_core). forward_promise onboarding message. GMV derived $6,818,827.73. dq_metric_scores 7 rows. Per-phase transaction pattern implemented. 500-pair novel discovery cap applied. |
+| 2026-05-20 | D-21 — GMV derivation from Shopify | — | Phase 4 of historical_pattern_scan.py. Writes gmv_derived_annual + gmv_derived_at to client_config. Updated on every full and incremental scan. |
+| 2026-05-19 | Session 3 — Mart patch: 13 new columns across mart_causal_chain_daily + mart_cross_source_daily | — | PASS=22 WARN=0 ERROR=0. ios_mpp_multiplier added to client_config. avg_days_to_refund (7.04d), aov_7d ($265 — seed deviation), effective_open_rate_7d (0.197 — 32 rows), vip_purchase_gap_days (42.1d after fix), ga4_pdp_bounce_rate (NULL expected), send_frequency_7d (32 rows), new_customer_rate_7d (0.133), blended_cac_7d ($371 — seed deviation), mobile/desktop checkout rates (NULL expected), post_purchase_flow_revenue_7d (32 rows), meta/tiktok/klaviyo_attributed_pct (0.155/0.032/0.012). S3-P1 through S3-P4 logged. |
+| 2026-05-19 | Session 3 — vip_purchase_gap_days formula fix | — | Bug: was measuring order age from today (avg ~355d). Fix: LAG() inter-purchase gap. Additional fixes: profile_id not customer_id, vip_status not is_vip (actual stg_klaviyo_profiles columns). Result: 730/730 rows, avg 42.1d (spec 30–90d ✓). Regression clean: 2025-10-15 → A1 C1, 2025-01-11 → A1 F2. |
+| 2026-05-19 | Step 10 — Slack Bolt bot + Socket Mode delivery | — | 5 alerts posted (A1, C1, F2, D1 — 4 distinct types). All 7 blocks render. Approve/Snooze/Dismiss all write to alert_log correctly. Schema deviations handled: evidence_stack_json (not evidence_stack), signal_value + threshold_value as separate numerics, action_taken_at + dismissal_reason added via ALTER TABLE. Button UI polish deferred (CD-11). /sentinel-test pending (CD-12). |
+| 2026-05-19 | Step 9 — Agent A (LangGraph) complete | b44ae63 | 5 nodes, 8 signals, zero LLM calls. All tests pass. |
+| 2026-05-19 | Item 6 — blended_gross_margin_pct column + mart fix + onboarding Q1b | — | Column in client_config, zero hardcoded values in mart, onboarding validates 0.20–0.85 range. |
+| 2026-05-19 | Item 2 — margin_floor_pct 28.0, contribution_margin_drop_threshold 10.0 | — | D1 fires on 3/730 synthetic dates (2025-01-11, 2025-01-12, 2026-01-04). Production floor correct for real client. |
+| 2026-05-19 | Item 3 — gorgias_sentiment_threshold 43.61 (p90) | — | C1 silent on quiet dates (2025-03-01 vel=25.80% < 43.61). Fires on high-signal dates (2025-10-15 vel=89.26%). Per-client recalibration required at onboarding (CD-10). |
+| 2026-05-19 | Item 4 — Recipe C CVR join fix (mart_cross_source_daily) | — | Replaced AVG(overall_cvr) with sessions-weighted ratio. Eliminates grain fan-out + funnel mismatch. avg_cvr now 0.00–1.00. dbt PASS=22. Confirmed test dates: 2025-10-15 (A1, C1), 2025-01-11 (A1, D1, F2). |
+| 2026-05-19 | D1 + E2 patch (contribution margin + repeat purchase rate) | b44ae63 | Both columns operational in mart_causal_chain_daily. |
+| 2026-05-19 | Pre-Agent A patch (A-7a through A-7j + A-8) | e56f954 | All 10 sub-gaps resolved. 22 models green. |
+| 2026-05-18 | Step 8 — Onboarding confirmation flow CLI | cd36497 | 5 questions, dbt full-refresh, cross-source insight within 10 min. |
+| 2026-05-18 | Step 7 validation (37 alerts) | ffa128f | 27 PASS / 6 PARTIAL / 4 FAIL (non-blocking). PRE-AGENT A clear. |
+| 2026-05-18 | stg_shopify_inventory_levels + items + touchpoint_journey | 2b55600 | 3 models green. Touchpoint 40.3% confirmed in spec. |
+| 2026-05-18 | Staleness fix | c6c5818 | 14 staleness columns added to 2 marts. |
+| 2026-05-18 | client_id var + generate_schema_name macro | 2cad0e6 | Routing corrected. |
+| 2026-05-18 | dbt rebuild (17 models) | 2cad0e6 | All green. mart_cross_source_daily 730 rows. |
+| 2026-05-18 | patch_script_final.py (3 patches) | — | return_lag_segment, verification_category, vertical_tag. |
+| 2026-05-18 | seed_sentry.py | 9dadd71 | 7,826 rows, 7/7 checks passed. |
+| 2026-05-18 | product_strategy.md Section 3A | — | All 56 alert codes written. |
+| 2026-05-18 | technical_architecture.md Section 3.2a | — | 9 new DDLs appended. |
+| 2026-05-18 | pre_agent_build_checklist.md created | — | First version. |
+
+---
+
+## HOW TO USE THIS FILE
+
+- **Before starting any agent build session:** read this file first.
+  Confirm all items in the relevant section are COMPLETE before proceeding.
+
+- **After any session that resolves a gap:** update the status field
+  and move the item to the Completed Items table with date and commit.
+
+- **After any session that discovers a new gap:** add it immediately.
+  Do not let gaps accumulate in state files without being logged here.
+
+- **Ownership:** This file is the single source of truth for build-state
+  gaps. State files are session logs. This file is the persistent tracker.
+
+
+---
+
+## PRE-AGENT D GAPS — E-SERIES (CONSOLIDATED 2026-05-26)
+*E1 locked 2026-05-23. E2/E3/E4 dropped from Phase 1 — deferred Phase 2.*
+*All E2-specific gaps (E-6 through E-18) CANCELLED — do not build.*
+*E-6 (new_customer_pct_90d) and E-17 (vertical_tag) retained for other uses.*
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| E-1 | `effective_click_rate_28d` mart column | PENDING | Add to `mart_causal_chain_daily`. Source: `stg_klaviyo_email_events` 28d rolling × ios_mpp_multiplier. Hard dependency for E1. |
+| E-2 | Klaviyo click rate real-data validation | PRE-BETA | Validate click_rate field populated cleanly on first real client. Agency-managed accounts may have gaps. |
+| E-3 | Campaign type classification — DO NOT BUILD | CLOSED PERMANENTLY | Agency naming unreliable. E1 surfaces raw click rates only. |
+| E-4 | 5-send minimum threshold calibration | PRE-BETA | Validate on first 3 real clients — low-frequency senders may never reach threshold. |
+| E-5 | ios_mpp_multiplier (0.65) calibration | PRE-BETA | Premium womenswear skews higher iOS. Recalibrate per client at onboarding. |
+| E-6 | `new_customer_pct_90d` mart column | RETAIN — Phase 2 | E2 dropped. Retain column for Phase 2 retention analysis only. Do not build E2 logic around it. |
+| E-7 | Welcome discount code confirmation | CANCELLED | E2 dropped. Remove from onboarding flow. |
+| E-8 | Brand event calendar auto-derivation for E2 | CANCELLED | E2 dropped. Confirm if needed for other alert series before building — do not build speculatively. |
+| E-9 | Customer discount classification | CANCELLED | E2 dropped. Do not build. |
+| E-10 | 1.5 SD threshold validation | CANCELLED | E2 dropped. Do not build. |
+| E-11 | S33 pre-condition enforcement | CANCELLED | E2 dropped. Do not build. |
+| E-12 | discount_classification_status column | CANCELLED | E2 dropped. Do not add to client_config. |
+| E-13 | Collection launch auto-detection for E2 | CANCELLED | E2 dropped. Do not build in historical_pattern_scan.py unless another alert requires it. |
+| E-14 | collection_launch_suppression_days column | CANCELLED | E2 dropped. Do not add to client_config. |
+| E-15 | new_customer_pct_90d (duplicate entry) | CANCELLED | Duplicate of E-6. Retain E-6 only. |
+| E-16 | S33 explanation alert language | CANCELLED | E2 dropped. |
+| E-17 | `vertical_tag` onboarding question | RETAIN | Still needed for network benchmarks and other alerts. Not cancelled. |
+| E-18 | brand_event_calendar documentation update | REVIEW NEEDED | With E2 dropped, confirm whether auto-population is needed for any remaining Phase 1 alert before building. Do not build speculatively. |
+
+**Rationale for E2/E3/E4 drop:** Cannot diagnose cause from Phase 1 connectors.
+Six cause buckets (CRM, product, competitive, acquisition pollution, macro, channel shift).
+Wrong action damages most valuable customer relationships. Weekly summary also rejected.
+Full rationale: state_2026_05_23_e_series_v2.md and chat_context_2026_05_23_e_series_v2.md.
+
+---
+
+## PRE-AGENT D GAPS — D-SERIES
+*Updated: 2026-06-01. D1 Gaps 1–3 LOCKED; Gap 4 DESIGN-COMPLETE (blocked on gate D1-G1); Gap 5 LOCKED. Gaps 6–9 pending.*
+
+### D1 Gap 1 — COGS Architecture (Locked 2026-05-26)
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| D-1 | COGS 4-tier architecture — CSV upload service | PENDING BUILD | Build /connectors/cogs_csv_processor.py. Non-trivial — fuzzy SKU matching, reconciliation output file, multi-file handling, currency conversion at upload using founder-stated FX rates. Flag for dedicated engineering sprint. |
+| D-2 | sku_cost_master ALTER TABLE | PENDING BUILD | Add columns: original_currency, fx_rate_used, active, landed_confirmed, upload_batch_id. Update cogs_tier constraint to include 'founder_csv'. Full spec in technical_architecture.md Section 11. |
+| D-3 | client_config ALTER TABLE — COGS columns | PENDING BUILD | Add: cogs_tier_active, cogs_shopify_confirmed, cogs_shopify_landed, cogs_multiplier_confirmed, cogs_owner_contact, cogs_gap_suppressed. Full spec in technical_architecture.md Section 11. |
+| D-4 | H20 alert — New SKU COGS Gap | PENDING BUILD | Add to causal_graph.py. routing: founder_action_required. source: sku_cost_master JOIN shopify_product_variants. Escalation cadence Day 0/5/10/15/20 US business days. Hard stop after Day 20. Second consecutive miss → accelerate to Day 5. |
+| D-5 | Agent D pre-condition — COGS tier check | PENDING BUILD | Before formatting any D1 alert: read client_config.cogs_tier_active → select template. finaloop/founder_csv → full margin alert. shopify_derived/founder_stated → driver-only. Never mix templates. If NULL → treat as founder_stated. |
+
+### D1 Gap 2 — Threshold Architecture (Locked 2026-05-26)
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| D-12a | brand_event_calendar ALTER TABLE — echo columns | PENDING BUILD | Add: echo_period_active (boolean), echo_expected_end_date (date), peak (boolean). peak=true → echo cap = return_window_days × 1.5, max 45 days. Full spec in technical_architecture.md Section 12. |
+| D-12b | client_config ALTER TABLE — Gap 2 columns | PENDING BUILD | Add 18 new columns: structural_cm_baseline_p25/p75, structural_cm_bau_day_count, structural_cm_baseline_updated_at, bau_cm_daily_sd, sparse_bau_profile, bau_coverage_rate, seasonal_profile, seasonal_profile_updated_at, brand_season_profile (JSONB), trigger_b_theil_sen_multiplier, bau_weekly_cm_sd, trigger_b_disabled_reason, d1_trigger_a_disabled, d1_trigger_b_disabled, structural_break_detected, structural_break_detected_at, structural_break_confirmed_by_founder. Full spec in technical_architecture.md Section 12. |
+| D-12c | New table — bau_week_registry | PENDING BUILD | CREATE TABLE public.bau_week_registry. Stores complete BAU weeks (all 7 Mon-Sun days clean). Columns: client_id, week_start_date, week_end_date, weekly_cm, season_window. One row per qualifying week. Used by Trigger B. Full DDL in technical_architecture.md Section 12. |
+| D-12d | Self-calibrating 3-pass BAU bootstrap | PENDING BUILD | Add to historical_pattern_scan.py. Three passes: (1) hard event flags only, (2) echo period filter applied, (3) final stabilisation + season profile derivation. Outputs: structural_cm_baseline_p25/p75, bau_cm_daily_sd, seasonal_profile, brand_season_profile, bau_coverage_rate, sparse_bau_profile. Must run at onboarding and monthly incremental scan. |
+| D-12e | BAU coverage audit and sparse_bau_profile detection | PENDING BUILD | After 3-pass bootstrap: compute bau_coverage_rate. If <15%: diagnose which filter is responsible. If genuinely event-dense: set sparse_bau_profile=true, d1_trigger_a_disabled=true, d1_trigger_b_disabled=true. No founder-facing message. CS flag. |
+| D-12f | Echo period open/close logic | PENDING BUILD | Write to historical_pattern_scan.py and live scan. Opens at daily_return_count ≥ 1.5× structural_bau_return_rate. Closes at rolling_7day_avg_return_count < 1.3× BAU for 7 consecutive days. Event-type caps as maximum backstop. Hysteresis prevents oscillation. |
+| D-12g | Structural break detection — 30-day rolling | PENDING BUILD | Run every 30 days. Compare recent_p50 (last 30 BAU days) vs prior_p50 (prior 60 BAU days). If ABS(difference) > break_magnitude AND both bounds shifted same direction AND shift persisted ≥21 BAU days → structural_break_detected=true, baseline reset, retrospective founder message. **Magnitude made brand-relative 2026-06-08 (Gap 6 residual pass): `break_magnitude` = floored multiple of the brand's own weekly-CM volatility (same pattern as Trigger B's magnitude_threshold), NOT a flat 5pp — see D-GAP6-26. The ≥21-day duration is unchanged, flagged to O-26.** |
+| D-12h | Season detection — brand-derived from BAU order volume | PENDING BUILD | Add to Pass 3 of bootstrap. Rolling 28d median of daily BAU order count. Identify local peaks/troughs. Flat profile: signal_strength = (peak−trough) / SD(daily_bau_order_count) < 2.0. Write brand_season_profile JSONB and seasonal_profile to client_config. |
+| D-12i | bau_week_registry — weekly population | PENDING BUILD | Weekly scan (Monday morning): identify weeks where all 7 Mon–Sun days pass all BAU exclusion filters AND no public holiday falls within the week. Write qualifying weeks to bau_week_registry with weekly_cm and season_window. US federal holiday calendar hardcoded. |
+| D-12j | Trigger B scan — Mann-Kendall + Theil-Sen | PENDING BUILD | Weekly scan after bau_week_registry updated. Requires 8+ complete same-season BAU weeks. Run Mann-Kendall (p < 0.10) and Theil-Sen slope. Magnitude threshold: MIN(MAX(bau_weekly_cm_sd × trigger_b_theil_sen_multiplier, 0.2pp), 0.5pp). Historical calibration at onboarding from retrospective Theil-Sen analysis. |
+| D-12k | Agent D pre-condition — Trigger A/B check | PENDING BUILD | Before formatting D1: check which trigger fired. Trigger A → HIGH urgency template. Trigger B → INFORMATIONAL template. If Trigger A fires same week → suppress Trigger B. Never fire both in same week. |
+| D-12l | causal_graph.py D1 update — Gap 2 pre-conditions | PENDING BUILD | Add to D1 entry: pre_conditions list including cogs_tier_check, trigger_a_or_b_check, echo_period_check, structural_break_check, sparse_bau_check. Add Trigger B as separate weekly scan entry distinct from 6-hourly Trigger A. |
+
+### D1 Gaps 3–9 and Remaining D-Series (Pending Deliberation)
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| D-13 | D1 Gap 3 — Causal decomposition | LOCKED ✓ 2026-05-31 | Principles 1–4 locked. Full spec in state_2026_05_31_d1_p1_p4.md and agent_d_build_spec_d_series_additions_2026_05_31.md |
+| D-14 | D1 Gap 4 — CPM → margin causal chain | DESIGN-COMPLETE ✓ 2026-05-31 | Five-step chain written as S44→S38→S41 + S35 CONSUMER model (O-14 resolved in-line). Blocked on 1 schema change — suppression_log component column — enforced by go-live gate D1-G1. Full spec in agent_d_build_spec.md "GAP 4 — D1 CPM DIAGNOSIS CHAIN"; gate in d1_validation_gates.md. |
+| D-15 | D1 Gap 5 — AOV decline | LOCKED ✓ 2026-06-01 | Standalone AOV driver RETIRED — D1 fires on CM *rate*; pure basket-size/list-price AOV decline does not move CM%; margin-relevant slices already in discount-depth + SKU-mix-shift drivers (would double-count + corrupt residual gate). No AOV component in S44, no S-rule touches it. Shipping/free-ship economics DEFERRED to 3PL as a cost-side detector (O-20 double-count trap). Founder-driven category shift ROUTED to Gap 8 (O-19: Findings A/B + materiality floor). Gaps 7/9 inherit the "AOV moved but margin held" note. Full spec in agent_d_build_spec.md "GAP 5 — AOV DECLINE: RETIRED AS A D1 DRIVER". |
+| D-16 | D1 Gap 6 — Seasonality suppression | WIP — PARKED (O-28) | 2 dependencies CLOSED (mix-shift → D-GAP6-1, organic-viral → D-GAP6-2); return-rate component PARTIAL (Seam 2 [S17/S18 vs C3] + C3 consistency check CLOSED 2026-06-03); COGS/S21 component CLOSED 2026-06-03; discount-depth/S19 PARTIAL 2026-06-04; **operational-cost/S20 CLOSED 2026-06-08**; **residual pass Tier-1 LOCKED 2026-06-08**: measured-not-explained rule, all-explained two-door fire, universal go-quiet ceiling, fulfilment estimated driver retired (D-GAP6-24), structural-break magnitude brand-relative (D-GAP6-26), BAU pre-sale-ramp exclusion + onboarding backfill (D-GAP6-25), operational-cost/S20 feed-only (D-GAP6-27), pre-sale-ramp handling (design held in state file Tier-2); **CLOSEOUT 2026-06-08 (cogs_parked): O-24a new-vs-returning return split RETIRED; thin-baseline confidence REFRAMED + BLOCKED on the COGS foundation (O-28); all-explained actionability gate + residual-band cutoffs BLOCKED on O-28; Gap 6 does NOT lock — PARKED behind O-28; build pivots D→C**. See agent_d_build_spec.md "GAP 6" + cross_alert_orchestration.md O-14/O-24/O-28. |
+| D-17 | D1 Gap 7 — "Entirely explained" framing | PENDING DELIBERATION | Must be retired. Decompose all drivers with % contribution each. |
+| D-18 | D1 Gap 8 — No action named | PENDING DELIBERATION | Each driver must have a specific named action for the founder. |
+| D-19 | D1 Gap 9 — No $ revenue impact | PENDING DELIBERATION | % drop creates no urgency. $ weekly impact required for Tier 1/1.5. |
+| D-20 | D2 Discount Dependency Creep — review | PENDING DELIBERATION | ELEVATED: now primary margin signal for sparse_bau_profile brands. Initial read was likely drop — revisit with this new context. |
+| D-21 | D3 COGS Step Change Impact — review | PENDING DELIBERATION | Initial read: questionable — founder already knows COGS changed. Deliberate after D2. |
+| D-22 | D4 Fulfilment Cost Anomaly — review | PENDING DELIBERATION | Initial read: likely stays — call 3PL today. Confirm after D3. NB 2026-06-08: D1's OWN estimated fulfilment driver is retired (feed-only, D-GAP6-24); D4 remains the dedicated fulfilment-cost alert, Phase-2, and is equally feed-gated — no estimation from carrier rates. |
+| D-23 | D5 Klaviyo Flow Revenue Declining — review | PENDING DELIBERATION | Initial read: likely Phase 2 — same problem as E4. Deliberate after D4. |
+| D-24 | D6 Seasonal Baseline Diagnostic — framing | PENDING DELIBERATION | Initial read: stays as suppression logic only — not founder-facing. Confirm framing after D5. |
+
+### D1 Gap 3 — Causal Decomposition (Locked 2026-05-31)
+
+| # | Gap | Status | Notes |
+|---|-----|--------|-------|
+| D-25 | New table — connector_gap_map | PENDING BUILD | CREATE TABLE public.connector_gap_map. Powers blind spot diagnostic. Columns: missing_driver, cogs_tier, residual_band, likely_cause_description, recommended_connector, action_brief. Seed rows required at launch. Full DDL + seed rows in technical_architecture_additions_2026_05_31.md |
+| D-26 | candidate_signals ALTER TABLE — interaction pattern columns | PENDING BUILD | ADD COLUMN pattern_type text default 'bivariate' (values: bivariate / interaction). ADD COLUMN driver_combination text[]. Full DDL in technical_architecture_additions_2026_05_31.md |
+| D-27 | client_config ALTER TABLE — Gap 3 columns | PENDING BUILD | Add: margin_mix_shift_threshold (numeric), bau_margin_weighted_revenue_sd (numeric), bau_category_revenue_share_sd (numeric), sku_cost_coverage_by_revenue (numeric), creative_fatigue_frequency_multiplier (numeric default 1.20), creative_fatigue_ctr_floor (numeric default 0.90), cpm_noise_threshold (numeric default 0.10). Full DDL in technical_architecture_additions_2026_05_31.md |
+| D-28 | sku_cost_master ALTER TABLE — category columns | PENDING BUILD | Add: founder_category (text), ai_inferred_category (text), category_inference_confidence (numeric), category_source (text default 'collection', values: collection / ai_inferred / manual). category_inference_confidence REDEFINED (Gap 6) as a cross-signal AGREEMENT score (signals: title / tags / product_type / vendor / collection membership), 0.70 provisional — NOT a raw model self-reported probability. Full DDL in technical_architecture_additions_2026_05_31.md |
+| D-29 | New onboarding script — connectors/category_inference.py | PENDING BUILD | Runs at onboarding Step 6 after historical_pattern_scan.py. Checks Shopify collection coverage (≥70%). INTERNAL grouping uses the AI clustering DIRECTLY — no founder rename required to group or to compute alerts. Rename is a DISPLAY GATE ONLY: it never blocks internal grouping or alert computation (retires the prior "mandatory founder rename step"). The collection-first default is OVERRIDDEN for internal grouping — collection membership stays as the DISPLAY label only. If the founder skips/declines the optional display rename → keep AI labels for display, category_source stays 'ai_inferred', and category-level D1 PROCEEDS (retires "graceful skip → suppressed"). Clustering-quality gate (see D-GAP6-3) scores return-rate coherence within clusters and sets the per-brand granularity verdict (category-granular vs brand-level-with-disclosure). Full spec in technical_architecture.md (category_inference.py + "CLUSTERING-QUALITY GATE"). |
+| D-30 | historical_pattern_scan.py — multivariate sweep extension | PENDING BUILD | Add multivariate sweep for interaction patterns alongside existing bivariate sweep. SEPARATE code path — do not merge. Writes to candidate_signals with pattern_type='interaction', driver_combination=text[]. Practitioner review gate MANDATORY — practitioner_approved=true required before any pattern fires in live alerts. calendar_clustered=true patterns flagged prominently at review. Full spec in technical_architecture_additions_2026_05_31.md |
+| D-31 | Agent D pre-condition 6 — residual gate | PENDING BUILD | After driver decomposition: compute residual_pct = (total_cm_gap − total_measured_impact) / total_cm_gap. <40% → fire D1 normally. 40–70% → fire with elevated disclosure, drop urgency one tier. >70% → run blind spot diagnostic, DO NOT fire standard D1. |
+| D-32 | Agent D pre-condition 7 — Layer 0 interaction check | PENDING BUILD | Before driver list: check three hardcoded patterns (creative fatigue, collection launch echo, platform cost shock) then approved candidate_signals interaction patterns for this client. If match → prepend Layer 0. No match → proceed to Layer 1 directly. Full pattern specs in agent_d_build_spec_d_series_additions_2026_05_31.md |
+| D-33 | Agent D — blind spot diagnostic (5-step) | PENDING BUILD | Runs when residual >70%. Five steps: (1) COGS tier check, (2) SKU mix check, (3) fulfilment cost check — **REVISED 2026-06-08: estimated `× 1.15` test RETIRED; mirror Step 1 — name fulfilment as a DIRECTION (no figure) only for trustworthy-margin brands, no claim otherwise** (D-GAP6-24), (4) data integrity check, (5) genuine structural unknown. Target: <10% of cases reach Step 5. Reads connector_gap_map for guidance text (the fulfillment_invoice row is a direction, not an estimated figure). Full spec in agent_d_build_spec.md (revised) + agent_d_build_spec_d_series_additions_2026_05_31.md |
+| D-34 | Agent D — live-vs-passed status per driver | PENDING BUILD | Agent D reads current 24–48 hour data per driver at render time alongside alert-week data. If driver normalised → framing shifts to "this passed — pattern to watch." If still active → "act now" framing. Applies to all D1 drivers without exception. |
+| D-35 | Agent D — SKU mix shift pre-conditions enforcement | PENDING BUILD | Before surfacing SKU mix as driver: check (1) sku_cost_coverage_by_revenue ≥ 0.85, (2) hero SKU has unit_cost, (3) no active event, (4) no active category promotion, (5) shift > margin_mix_shift_threshold = MAX(bau_margin_weighted_revenue_sd × 1.5, 1.5pp floor) — NO CEILING, (6) seasonal-typicality grade per the resolved D-GAP6-1 design (event-anchored IQR percentile in the brand's own prior same-season MARGIN band; state ceiling 0/1/2+; State 3 → suppress, State 2/1 → surface) — retires the prior binary ±1 SD / ≥12-month rule; Phase-1 No-Seed principle applies (S15 thresholds dormant in Phase 1, S16 tiers brand-own, S3 dates event-derived), (7) founder_category populated. Output at category level only — never at SKU level. |
+| D-36 | Agent D — spend misallocation sub-finding in CPM section | PENDING BUILD | When CPM is a named driver AND Tier 1/1.5: check margin_weighted_roas vs blended_roas. If blended_roas stable (within 10% BAU) AND margin_weighted_roas >15% below BAU → append SKU-level spend misallocation finding with specific media buyer brief. Tier 2/3: spend concentration shift only, no margin figures. |
+
+---
+
+### GAP 6 DEPENDENCIES — DO NOT MISS IN GAP 6 BUILD
+
+| # | Dependency | Status | Notes |
+|---|-----------|--------|-------|
+| D-GAP6-1 | SKU mix-shift seasonal suppression — RESOLVED | WIP — implement in Gap 6 | Grade the mix-shift driver on its MARGIN IMPACT (CM%), NOT category-share shift, by event-anchored IQR percentile position in the brand's own prior same-season MARGIN band (NO z-score / NO ±SD). Carry the grade in a separate seasonal_typicality_state field (NOT variance_explained_pct), S41-decayed. Spend-reallocation disqualifier runs FIRST (a shift co-moving with a deliberate reallocation is ineligible for seasonal suppression). Admissibility = post-structural-break AND cost-coverage ≥ 0.85. State ceiling by admissible-season count: 0 → narrate/disclose; 1 → State-2 max (fire-with-context, NEVER suppress); 2+ → full / State 3 available. State 3 → suppress (driver does not surface); State 2 / State 1 → surface (framing handled at the D1 alert-language pass). Event-anchored band (match S2/S46); per-event prior-year coverage. One calibrated sensitivity multiplier at the State-2↔State-1 edge — NOT a 6th S44 component. (Retires the prior "seasonal_profile='seasonal' AND ≥12 months → suppress if within prior-year same-season range ±1 SD / adaptive below 12 months" rule entirely.) See agent_d_build_spec.md "GAP 6 — Dependency 1" and technical_architecture.md GAP 6 DEPENDENCIES. |
+| D-GAP6-2 | Organic-viral detection — RESOLVED (D1-scoped; detector rewrite routed) | WIP — implement in Gap 6 | NOT blanket suppression. D1-scoped behaviour: (a) exclude the surge days from the BAU baseline + (b) a concurrent discount-depth read surfaced WITH viral context, gated by the O-19 materiality + actionability floor (the concurrent new-customer welcome-code compression is the actionable lever; blanket suppression would hide it). Detect via S33's brand-level new-customer-pct surge signal (>15% surge), NOT a single-SKU revenue test. Founder confirmation = the organic-vs-engineered discriminator; if unconfirmed → provisionally-locked-and-tracking. DROPPED: forward 30/60/90 repeat tracking in D1 (repeat maturation stays with S33/E2), any viral-specific returns model, overlap handling. S33's hardcoded 20% viral-cohort repeat cutoff → make brand-relative (logged for the orchestration pass; S-rule def NOT edited here). Shared launch-detector rewrite (separate organic_viral from collection_launch; C6 conflation; E2 double-suppression) ROUTED to O-11 and BATCHED to causal_graph.py — described, NOT implemented here. (Retires the prior "spend spike optional → single-SKU +2SD → collection_launch_suppression_active = true → D1 suppressed for return_window_days" rule entirely.) See agent_d_build_spec.md "GAP 6 — Dependency 2" + cross_alert_orchestration.md O-11. |
+| D-GAP6-3 | Clustering-quality gate (onboarding) | PENDING BUILD | Score AI clustering by return-rate coherence within clusters; per-brand granularity verdict on client_config (category-granular vs brand-level-with-disclosure). Brand-level path is the EXPLICIT low-quality outcome and MUST emit the disclosure — never a silent fallback. Go-live gate D1-G3 enforces. Spec in technical_architecture.md "CLUSTERING-QUALITY GATE (onboarding)". |
+| D-GAP6-4 | seasonal_typicality_state field | PENDING BUILD | Add seasonal_typicality_state to suppression_log (mix-shift driver grade; State 1/2/3; S41-decayed), SEPARATE from variance_explained_pct (typicality ≠ seasonal attribution; overloading corrupts S42 stacking / S39 learning). Schema change BATCHED post-H. Spec in technical_architecture.md suppression_log. |
+| D-GAP6-5 | S3 event-derived return window | PENDING BUILD | Retire S3's hardcoded Jan 1–21 / Jan 22 cliff. Derive the brand's holiday SELLING window from its own revenue concentration + brand_event_calendar, width-matched, then push forward by return_window_days = expected return-spike window. State 3 across it; S41 owns the decay (no date cliff). First holiday with no prior year → narrate/disclose. S-rule definition change ROUTED to the orchestration pass (seed_decisions_gap_f_g.md NOT edited here). |
+| D-GAP6-6 | S33 brand-relative viral-cohort cutoff | PENDING BUILD | S33's hardcoded 20% viral-cohort repeat-rate cutoff → brand-relative (below the brand's own new-customer-cohort repeat-rate band). S-rule definition change ROUTED to the orchestration pass — logged at cross_alert_orchestration.md O-22; NOT edited here. |
+| D-GAP6-7 | O-11 shared launch-detector rewrite | ROUTED — BATCHED post-H | Separate organic_viral from collection_launch (new-SKU count vs single-SKU revenue; different recovery clocks); fix the spec self-contradiction; C6 conflation; E2 double-suppression; detector shared D1/C6/E2. Lives in causal_graph.py — BATCHED post-H, NOT done this pass. Logged at cross_alert_orchestration.md O-11. |
+| D-GAP6-8 | Brand-action return events routed through event calendar | PENDING BUILD | D1 return component consults active brand_event_calendar rows of event_type size_guide_update / photography_update and applies the row's residual_threshold_pct + decay (same consumer treatment as S3/S15/S16). Single source of truth = the event row; do NOT hand-duplicate S17/S18 in D1. Inherits S17 State-3 / S18 State-2 via suppress_alerts vs context_alerts. Component isolation preserved (concurrent defect still fires). Window = return_window_days, not fixed 14/21. Default = narrate (context_alerts), never silent suppress while source unreliable. See agent_d_build_spec.md GAP 6 Seam 2; gate D1-G8. |
+| D-GAP6-9 | size_guide_update event_type + affected_category column | PENDING BUILD | Add size_guide_update to brand_event_calendar event_type list (was missing). Add affected_category text[] column (NULL = brand-wide). Until populated, brand-action quiet is brand-wide WITH DISCLOSURE, never silent brand-wide mute. DDL in technical_architecture.md (brand_event_calendar). Schema change BATCHED post-H. |
+| D-GAP6-10 | Tier-1 size-guide auto-detect (metaobject) | PENDING BUILD | Silent onboarding probe: if size chart is a metaobject, subscribe to its update webhook (filter by type); else (Page/theme/app) fall back to narrate-on-return-movement. On edit → content-diff size/measurement values → meaningfulness magnitude (typo≈0; provisional cutoff, outcome-calibrated) → writes low-confidence context note, surfaces only if a return-driven margin movement would otherwise fire within return_window_days. Photography: product-image swaps diff-detectable via products/update; theme swaps not. Detection code = pending Claude Code action, BATCHED post-H. See technical_architecture.md detection note. |
+| D-GAP6-11 | Return-driver action anchored on return reason + "extreme" test | PENDING BUILD | Headline = return signal + action anchored on dominant return reason (sizing-fit / quality-defect / not-as-pictured / channel over-returning). Size/photo change only DOWNGRADES urgency to deferred-with-expiry; founder "no change" → softener stripped, action fires now. Softener FORBIDDEN when reason = quality/defect OR magnitude extreme. "Extreme" = OR of three brand-relative tests: level (group's own band, finest clustering-certified granularity — NOT blended average / fixed ×), exposure (units/margin at risk vs materiality band), trajectory (still climbing through return window). Thin group history → exposure fallback. Cross-brand/vertical OUT (Phase 2). Gates D1-G6 / D1-G7. C3 reconciliation logged for C-series (cross_alert_orchestration.md). |
+| D-GAP6-12 | COGS S21: per-product sell-through replaces 60-day window | PENDING BUILD | Retire the fixed 60-day window. Phase-in of a supplier cost increase = each SKU's own sell-through of pre-increase stock (fast movers reflect new cost sooner). Phased curve needs an average-cost feed (Finaloop/Stocky); Shopify's single non-retroactive cost field has no layers, so absent a feed narrate the phasing, never fabricate a "% realized". S21 relabel logged for orchestration pass (seed NOT edited). See agent_d_build_spec.md GAP 6 COGS. |
+| D-GAP6-13 | Cost-increase driver is feed-only; no margin verdict otherwise | PENDING BUILD | Cost-increase detection only when cogs_confidence_level=high (trustworthy feed). No-trustworthy-COGS brands get NO margin verdict → component signals only (returns/CPM/discounting). Gate D1-G9. NOTE: tightens locked Gap 1 (driver-only → component-only) — FLAGGED PROPOSAL, do NOT build until founder confirms. |
+| D-GAP6-14 | Onboarding cost-capture + staleness-decay + revenue coverage | PENDING BUILD | Onboarding: confirm Shopify cost correctness, CSV for gaps/wrong, ping permission, and founder's own cost-refresh rhythm → client_config.cogs_refresh_rhythm_days + cogs_last_confirmed_at. Staleness-decay: full figures within rhythm → live caveat past rhythm → no figure well past (gate D1-G10). Revenue-weighted cost coverage via sku_cost_coverage_by_revenue (gate D1-G11). New-SKU-missing-cost ping = reliable nudge; periodic cadence ping = weak lever. New client_config fields BATCHED. |
+| D-GAP6-15 | State-driven cost disclosure (not per-alert footnote) | PENDING BUILD | No footnote when cost fresh/trusted (basis one click away); specific live caveat when aging; no margin figure when stale. Footnote-on-every-alert rejected (erodes confidence, goes blind when it matters). Disclosure is the visible face of staleness-decay. Gate D1-G10. |
+| D-GAP6-16 | Per-item discount staging (line-item model) | PENDING BUILD | NEW staging model unpacking Shopify `LineItem.discountAllocations` (allocatedAmount per line + discount type automatic/code). Airbyte's Shopify connector already pulls these nested in orders; nothing unpacks them. LANDMINE: never read `total_discount` / `totalDiscountSet` / `discountedTotalSet` (empty/zero on order-level/code discounts; Shopify recommends allocations). Our build, not an API/sync gap. See technical_architecture.md 2026-06-04 appendix. |
+| D-GAP6-17 | Effective-discount source decomposition output | PENDING BUILD | When D1 fires (Trigger A/B) and discounting is a leading contributor, decompose effective discount by source (code/automatic/shipping, data-derived). Rides a REAL trigger, never a discount-specific threshold; no founder code-tagging; no "deeper than intended/history" judgment. Dollar impact feed-only; depth-terms directional/unsized for non-feed brands. See agent_d_build_spec.md GAP 6 discount-depth/S19. |
+| D-GAP6-18 | Returns ingestion — Shopify Returns API primary + Loop enrichment | PENDING BUILD | Read returns from the new Shopify Returns API as primary (works with/without Loop, post-~Apr-2026 migration); Loop API as enrichment (Shop-Now/advanced-exchange detail, label rates, dispositions). Behind a thin adapter. Keep return-object (RMA: reason/exchange/disposition) distinct from refund-object (money; existing stg_shopify_refunds). JOIN on order ID + Shopify numeric customer ID (pseudonymous, not PII); NEVER email; unlinkable returns excluded, no email fallback. Build post-migration, never legacy refund endpoints. |
+| D-GAP6-19 | Loop returns/exchange staging + return-to-replacement link + two exchange paths | PENDING BUILD | Clean staging: separate exchange from refund; carry returned variant AND replacement variant (size direction structural for variant exchanges); capture label shipping cost (exchange reverse-ship ops cost). TWO PATHS: variant exchange → size-direction, revenue-neutral, ops-cost-only; advanced/different-product (Shop Now) → return-plus-purchase, variable margin. OOS-exchange→refund case routed to STOCKOUT workstream (confirm at build whether Loop exposes the failed-exchange reason). |
+| D-GAP6-20 | Gorgias NLP parser — NEAR-TERM CORE INFRA | PENDING BUILD | Feeds multiple alerts (sizing velocity, return-reason, retrospective review, sale channel) — tags unreliable at this tier and worst during sales, so parse text not tags. BUILD: text → trustworthy intent/reason with (a) brand-specific label schema, (b) stated multi-intent rule, (c) customer-messages-only (not macros), (d) low-signal reporting when templated. Train taxonomy on ≥1yr history (recent-weighted; re-check periodically). History trains classifier; live small-sample velocity handled by a firing floor + honest silence, NOT history. OUTPUT: faithful summary + link to tickets; NO recommended action (O-27). Complaint-to-return conversion = slow/data-earned, parked. See technical_architecture.md 2026-06-04 appendix. |
+| D-GAP6-21 | Parser per-brand accuracy gate before pilot | PENDING BUILD | Per-brand accuracy check vs a human-labelled sample BEFORE any pilot client sees parser output. Gate D1-G12 (d1_validation_gates.md). Converts "we believe it's accurate" → "we measured it" for a precision-first product. |
+| D-GAP6-22 | Sale-period informational channel + delivery-label ingestion | DEFERRED — Horizon-2 / probationary | Separate mutable sale-period channel (NOT the acute alert), minimal for beta to collect sale-event data, unvalidated until enough real sales. DELIVERED-cohort complaint pulse + in-transit share, NOT a return-rate readout (lag). HARD RULE: never show a number the founder's dashboards already show. Representativeness gate (delivered cohort must look like the whole sale, not its fast front edge) — release condition, not a fitted baseline. Mix-risk: history-assisted for established product, live-only for new collections. Needs delivery-label ingestion. |
+| D-GAP6-23 | Remove/re-scope orphaned margin_floor_pct | PENDING — post-Gap-6 audit | client_config.margin_floor_pct (default 5%) NOT wired into locked D1 Trigger A/B (fully brand-relative); relic of pre-Gap-2 absolute-floor design. Remove or consciously re-scope in the post-Gap-6 consistency audit. cross_alert_orchestration.md O-25/O-26. Do NOT wire in as-is. |
+| D-GAP6-24 | Retire estimated fulfilment driver from D1 | PENDING BUILD | 2026-06-08 (Gap 6 residual pass). Remove the estimated `(fulfillment_cost_per_order − bau) × orders` driver from D1 decomposition, the blind-spot Step-3 `× 1.15` test, the Known-Driver-Set entry, and the "Disclosure Type 2 — Estimation flag" (4 sites in agent_d_build_spec.md; mirrored in technical_architecture.md weekly_cm + connector_gap_map notes). Fulfilment is FEED-ONLY: re-enters only with a real cost-side feed (3PL invoice / Shopify-Shipping-Label), Horizon-2, one uniform build, honoring O-20. Free-ship economics stay revenue-side (Gap 5), never summed with carrier cost. |
+| D-GAP6-25 | BAU baseline excludes pre-sale ramp + onboarding two-pass backfill | PENDING BUILD | 2026-06-08 (Gap 6 residual pass). Add `pre_sale_ramp_active` to the qualifying-BAU-day exclusion list (agent_d + tech-arch). One-time onboarding TWO-PASS backfill in historical_pattern_scan.py: pass 1 detect ramps on raw history, pass 2 rebuild baseline excluding them — the first baseline cannot be certified clean until ramps are excluded. Pre-sale-ramp DETECTOR design (4 signals; thresholds LEARNED from the brand's own past ramps, admissibility-ladder-gated; two jobs — BAU-exclude + D1 narrate-with-context, default no-action note that never says "cut spend", investigate-not-cut only when extreme) is HELD IN FULL in the session state file (Tier-2), folded in when Gap 6 closes. Sales are DATA-INFERRED (volume>median + discount-depth crosses p50), not founder-declared; website crawling rejected; structured scheduled-discount ingestion a future option. |
+| D-GAP6-26 | Structural-break magnitude brand-relative | PENDING BUILD | 2026-06-08 (Gap 6 residual pass). Supersedes the flat `> 5pp` in D-12g: `break_magnitude` = a floored multiple of the brand's own weekly-CM volatility (same pattern as Trigger B's magnitude_threshold). The ≥21-day persistence DURATION is unchanged but flagged to the O-26 consistency audit. See technical_architecture.md STRUCTURAL BREAK DETECTION + agent_d_build_spec.md. |
+| D-GAP6-27 | Operational-cost/S20 — feed-only, no estimation | PENDING BUILD | 2026-06-08 (Gap 6 residual pass, LOCKED). Operational cost is D1's 5th margin component but FEED-ONLY: no change-verdict without a real cost-side feed. `client_config` fulfilment-cost field (D1 weight 0.05) is a STATIC baseline only (cannot move → cannot signal compression). No weight×zone estimation (confident-wrong). Seed S20 mechanic (Month-15 / $3,950 / full-suppress) RETIRED. Known 3PL transitions ride the shared known-events layer (brand_event_calendar), narrated. Future cost-side detector = ONE uniform feed-agnostic build (3PL invoice OR Shopify-Shipping-Label), Horizon-2, honors O-20. New-product cost-collection mechanism (burst-gate drip+departure, wave-crest debounce, list-price-ranked fill prompt, publication-triggered) HELD IN FULL in the session state file (Tier-2). |
+
+---
+
+### A-SERIES FLAG — FROM D1 GAP 3 DELIBERATION
+
+| # | Flag | Status | Notes |
+|---|------|--------|-------|
+| A-FLAG-1 | Margin-Weighted ROAS vs Blended ROAS Divergence | FLAG FOR A-SERIES DELIBERATION | Named candidate alert. Detects agency/media buyer scaling toward lower-margin SKUs while blended ROAS appears stable. Clears Action-First bar: specific, same-day, high-impact — founder calls agency with SKU-level spend data. Must be named in A-series deliberation. Do not skip. Full description: state_2026_05_31_d1_p1_p4.md |
