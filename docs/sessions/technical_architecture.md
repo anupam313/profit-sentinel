@@ -1,5 +1,5 @@
 # Profit Sentinel — Technical Architecture
-*Version: Post-critique redesign | Last updated: 2026-06-14 (§11 File Locations — git-backed docs/ design-docs folder added, commit 7402434) | 2026-06-08 (D1 Gap 6 residual pass — BAU baseline now excludes pre-sale ramp windows + onboarding two-pass backfill; structural-break magnitude made brand-relative; D1 estimated fulfilment driver retired [D4 stays Phase-2]; fulfilment is feed-only in CM; see agent_d_build_spec.md + cross_alert_orchestration.md) | prior: 2026-06-04 (discount-depth/S19 PARTIAL: discount/returns/Gorgias-parser build items appended at end; margin_floor_pct flagged orphaned)*
+*Version: Post-critique redesign | Last updated: 2026-06-08 (D1 Gap 6 residual pass — BAU baseline now excludes pre-sale ramp windows + onboarding two-pass backfill; structural-break magnitude made brand-relative; D1 estimated fulfilment driver retired [D4 stays Phase-2]; fulfilment is feed-only in CM; see agent_d_build_spec.md + cross_alert_orchestration.md) | prior: 2026-06-04 (discount-depth/S19 PARTIAL: discount/returns/Gorgias-parser build items appended at end; margin_floor_pct flagged orphaned)*
 
 <!-- 2026-06-02 spec-update pass (D1 Gap 6 WIP): rename strike + AI-clustering/
 display-gate notes; category_inference_confidence redefined as cross-signal
@@ -1305,9 +1305,6 @@ Frontend (to be built):
 
 GitHub repository:
 https://github.com/anupam313/profit-sentinel
-
-Design docs (git-backed, commit 7402434):
-[project root]\docs\
 ```
 
 ---

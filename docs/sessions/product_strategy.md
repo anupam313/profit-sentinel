@@ -1,6 +1,6 @@
 # Profit Sentinel — Product Strategy
 *Version: Post-competitive reassessment | Status: Pre-customer discovery*
-*Last updated: May 2026 — Sections 8, 11, 12 revised. Section 3A written May 2026. Sections 2, 3, 3B(new), 5, 7, 11, 12 updated post-MOS discovery interview May 21 2026. 2026-06-04: Section 12 — Gorgias NLP parser as core infra + text-signal action posture closed as positions; Loop-vs-native returns discovery item added (D1 Gap 6 discount-depth/S19). 2026-06-08: Gap-1 component-only ADOPTED as the working assumption (no-trustworthy-cost brands get component signals only, no margin verdict; formal sign-off at alert-language); operational-cost/fulfilment scoped feed-only (parallel to COGS); D1 Gap 6 residual pass — operational-cost/S20 closed, fulfilment estimated driver retired. 2026-06-14: Section 3D — Deliverability Risk (E5) added to the alert library; missing A7 summary-table row restored; alert count reconciled to 58 (39 business A1–G4 + 19 system H1–H19) across all homes. 2026-06-14 (Session 2): §3 wording cleanup — "Five Proactive Alerts" framing retired (reframed as the five day-one alerts, a subset of the 58-type library); the six-model attribution chooser in §5 marked DEFERRED to post-pilot with the pilot's single fixed basis stated (click-based, time-decay, 14-day) and the six-model design retained as the post-pilot target; stale §3C patch-cruft header removed; C2 summary-table row collapsed to one (2-stage) row — alert count unchanged at 58, table rows now equal distinct ids.*
+*Last updated: May 2026 — Sections 8, 11, 12 revised. Section 3A written May 2026. Sections 2, 3, 3B(new), 5, 7, 11, 12 updated post-MOS discovery interview May 21 2026. 2026-06-04: Section 12 — Gorgias NLP parser as core infra + text-signal action posture closed as positions; Loop-vs-native returns discovery item added (D1 Gap 6 discount-depth/S19). 2026-06-08: Gap-1 component-only ADOPTED as the working assumption (no-trustworthy-cost brands get component signals only, no margin verdict; formal sign-off at alert-language); operational-cost/fulfilment scoped feed-only (parallel to COGS); D1 Gap 6 residual pass — operational-cost/S20 closed, fulfilment estimated driver retired.*
 
 ---
 
@@ -51,11 +51,11 @@ NEW: "Profit Sentinel explains WHY something is happening across data
 
 ---
 
-## 3. The Five Day-One Alerts
+## 3. The Five Proactive Alerts
 
 **Design principle:** For sub-$5M brands, the value is NOT detection — founders already know something is wrong. The value is cross-source EXPLANATION across data they cannot join manually.
 
-**Important scope note:** These five are the Phase 1 day-one alerts — the subset that fires immediately with Phase 1 connectors only and requires no historical depth. The full alert library contains 58 alert types (A1–G4 business alerts + H1–H19 system alerts). All 58 are active in Agent A — the others fire as Phase 2 connectors come live and as historical depth accumulates. The five below are not a product limitation; they are the guaranteed day-one cross-source value for any brand onboarding with Phase 1 connectors only.
+**Important scope note:** These five are the Phase 1 day-one alerts — the subset that fires immediately with Phase 1 connectors only and requires no historical depth. The full alert library contains 56 alert types (A1–G4 business alerts + H1–H19 system alerts). All 56 are active in Agent A — the others fire as Phase 2 connectors come live and as historical depth accumulates. The five below are not a product limitation; they are the guaranteed day-one cross-source value for any brand onboarding with Phase 1 connectors only.
 
 ### Alert 1: True Post-Return ROAS by Channel
 **Sources:** Shopify + Meta + TikTok + Google Ads
@@ -64,7 +64,7 @@ NEW: "Profit Sentinel explains WHY something is happening across data
 
 *Why this is new information:* Founders see channel ROAS in each platform separately. They cannot see post-return blended ROAS across channels without joining Shopify returns with Meta, TikTok, and Google Ads attribution data at order level.
 
-*Attribution note:* For the pilot, ROAS uses one fixed attribution basis — click-based, time-decay, 14-day window. (Per-founder model configuration is the post-pilot design — see Section 5.)
+*Attribution note:* ROAS computed using founder's configured attribution model (set at onboarding — see Section 5). Default: time decay, 14-day window. Founders who configure differently will see ROAS labelled with their chosen model to avoid confusion.
 
 ### Alert 2: Root Cause of ROAS Drop Already Noticed
 **Sources:** Meta + TikTok + Google Ads + Shopify
@@ -121,7 +121,7 @@ $ weekly impact and named driver.
 
 Returns are a disproportionate profit lever in fashion — systematically undermonitored because boards and founders focus on net revenue, not gross-to-net reconciliation. MOS interview confirmed: returns analytics is a genuine operational pain point, not a polite acknowledgment.
 
-Beyond the five day-one alerts, the following returns intelligence signals are in scope for Phase 1 build given they require no new connectors (all derivable from ReturnGo/Loop Returns + Shopify + Gorgias):
+Beyond the five core alerts, the following returns intelligence signals are in scope for Phase 1 build given they require no new connectors (all derivable from ReturnGo/Loop Returns + Shopify + Gorgias):
 
 **Serial repeat offender detection**
 Flag customers whose lifetime return value exceeds a configurable threshold (e.g. >$500 in returns). Actionable: founders can adjust return policy for flagged customers or implement return fee tiers.
@@ -229,11 +229,11 @@ design session.
 
 ---
 
-## 3D. Alert Library — Full 58-Type Specification
+## 3D. Alert Library — Full 41-Type Specification
 *Written May 2026. Replaces placeholder. All decisions locked.*
 
 ### Overview
-58 alert types across 8 groups (A–H). Each alert has:
+41 alert types across 8 groups (A–H). Each alert has:
 - A unique code (A1, B3, H7 etc.)
 - A plain-English name
 - **Actionability classification:** High-Actionability / Monitor-and-Wait / Diagnostic-Only
@@ -247,7 +247,7 @@ design session.
 - **B:** Action-confounded — founder's action changes outcome, making direct verification impossible. Requires cross-client validation.
 - **C:** Structurally unverifiable. Agent D always communicates explicit uncertainty in plain English. May never reach 95% precision.
 
-**H-series note:** H1–H19 are system health and DQ alerts (extended to H19 in the May 2026 session). Total alert codes: 58 (A1–G4 = 39 business alerts, H1–H19 = 19 system alerts).
+**H-series note:** H1–H19 are system health and DQ alerts. The original "41 types" counted A–G groups only (business alerts). H-series was extended to H19 in May 2026 session. Total alert codes: 57 (A1–G4 = 38 business alerts, H1–H19 = 19 system alerts).
 
 ---
 
@@ -460,7 +460,7 @@ design session.
 
 ---
 
-### Group E — Customer Retention and Lifecycle (E1–E5)
+### Group E — Customer Retention and Lifecycle (E1–E4)
 
 **E1 — List Health Degradation**
 - Actionability: Monitor-and-Wait
@@ -494,15 +494,6 @@ design session.
 - What it detects: Post-purchase email sequence (Flow 3) driving fewer repeat purchases than prior 90-day average. Signals content or timing issue in the retention sequence.
 - Connectors required: Klaviyo + Shopify
 - Confidence floor: 60%
-
-**E5 — Deliverability Risk**
-- Actionability: High-Actionability
-- Verification: A
-- What it detects: Spam complaint rate climbing toward the inbox-provider threshold (e.g. Gmail). Emails will begin landing in spam within days unless unengaged subscribers are suppressed. Leading indicator — fires before deliverability degrades, while the move is still reversible.
-- Connectors required: Klaviyo
-- Confidence floor: 75%
-- Delivery: Immediate — bypasses 9am business hours hold.
-- Suppression rule: E5 is root cause — when E5 fires, suppress E1 and D5.
 
 ---
 
@@ -686,14 +677,14 @@ H-series alerts are system health and DQ alerts. Confidence floors are not thres
 | A4 | Attribution Model Inconsistency | Diagnostic | C | 50% |
 | A5 | Blended CAC vs LTV Threshold | Monitor | B | 70% |
 | A6 | Return-Adjusted Revenue by Cohort | Diagnostic | A | 60% |
-| A7 | Wholesale Order Contamination Warning | High | A | 80% |
 | B1 | Creative Fatigue Signal | High | B | 60% |
 | B2 | Ad Spend Concentration Risk | Monitor | B | 70% |
 | B3 | TikTok Organic-to-Paid Gap | Monitor | B | 55% |
 | B4 | Audience Saturation Signal | Monitor | B | 65% |
 | B5 | Campaign Learning Phase Disruption | High | A | 80% |
 | C1 | Sizing Complaint Velocity | High | A | 65% |
-| C2 | Influencer ROI After Returns (2-stage) | High | B | 55% |
+| C2 | Influencer ROI After Returns (Stage 1) | High | B | 55% |
+| C2 | Influencer ROI After Returns (Stage 2) | High | B | 70% |
 | C3 | SKU Return Rate Outlier Confirmed | High | A | 75% |
 | C4 | Return Initiation Spike Confirmed | Monitor | A | 70% |
 | C5 | Return Reason Contamination | Diagnostic | C | 50% |
@@ -709,7 +700,6 @@ H-series alerts are system health and DQ alerts. Confidence floors are not thres
 | E2 | Repeat Purchase Rate Declining | Monitor | B | 65% |
 | E3 | High-LTV Customers Going Quiet | Monitor | B | 60% |
 | E4 | Post-Purchase Flow Declining | Monitor | B | 60% |
-| E5 | Deliverability Risk | High | A | 75% |
 | F1 | Checkout Conversion by Device | High | A | 70% |
 | F2 | Payment Gateway Failure | High | A | 75% |
 | F3 | External Traffic Disruption | Diagnostic | C | 50% |
@@ -740,6 +730,12 @@ H-series alerts are system health and DQ alerts. Confidence floors are not thres
 | H19 | Permanent DQ Limitation Disclosure | Diagnostic | C | — |
 
 *H-series confidence floors left blank — system health alerts are not threshold-based.*
+
+---
+# Profit Sentinel — Product Strategy
+## PATCH: Section 3C Addition (May 21 2026)
+## Instruction: Insert Section 3C immediately after Section 3B (NLQ) and before Section 3D (Alert Library)
+## All other sections unchanged.
 
 ---
 
@@ -944,9 +940,7 @@ These six questions run after staging completes, before marts run for the first 
    → Writes: business_model_type
    → Determines: which baseline comparison method is used for margin alerts
 
-3. **Attribution model:** "When measuring ROAS, which attribution model do you want as your baseline? Your selected model is used for alerts and recommendations."
-
-   **Pilot status — DEFERRED:** The chooser below is the post-pilot full-product design (six models + custom weights), retained here as the target. **The pilot ships one fixed attribution basis — click-based, time-decay, 14-day window** — with no per-founder model choice during the pilot.
+3. **Attribution model:** "When measuring ROAS, which attribution model do you want as your baseline? We'll compute all models but will use this one for alerts and recommendations."
 
    Options presented with one-line explanation each:
    - **Last touch** — Full credit to the final click before purchase. Simplest, but undervalues brand awareness spend.
@@ -1090,7 +1084,7 @@ We're watching. You'll hear from us when it matters.
 - Connector list in headline is dynamic — only shows connected sources
 - "Your first alert will fire" language only used if ≥1 chain is at provisional or core tier
 - "Why did my ROAS drop?" in NLQ example is accurate at pilot — Agent B handles causal reasoning
-- Causal NLQ questions for chains not yet in the 58 return: "I can see X happened but I don't yet have enough data to identify the cause — I'm tracking it"
+- Causal NLQ questions for chains not yet in the 56 return: "I can see X happened but I don't yet have enough data to identify the cause — I'm tracking it"
 
 ---
 
@@ -1102,7 +1096,7 @@ We're watching. You'll hear from us when it matters.
 
 ## 7. Connector Prioritisation Framework
 
-### Phase 1 Connectors (Day-One — Required for the Five Launch Alerts)
+### Phase 1 Connectors (Day-One — Required for Five Core Alerts)
 *Updated May 21 2026 — Google Ads added as first-class Phase 1 connector.*
 
 - Shopify (orders, refunds, inventory, products)
@@ -1335,7 +1329,7 @@ interview before next session.
 
 **Alert suppression based on financial capacity — CLOSED May 2026:** Profit Sentinel does NOT suppress alerts based on inferred financial capacity. `capital_constraint_active` in `client_config` re-ranks Agent C action suggestions only — spend-increase actions demoted, not removed. Alert always fires. Founder always sees all options. Suppressing a correct alert because the system inferred the founder couldn't fund it causes invisible harm and is worse than an unactionable alert.
 
-**Attribution model and window — CLOSED for onboarding design, May 21 2026:** Full attribution model flexibility offered at onboarding across six models plus custom weights. Default: time decay, 14-day window. Default window of 14 days is a working assumption pending validation across remaining discovery interviews — if consistent founder data suggests a different default, update `client_config` default value only; the onboarding question and option set are locked. See Section 5 for full rationale. **[Pilot update 2026-06-14: the onboarding chooser is DEFERRED to post-pilot; the pilot ships one fixed basis — click-based, time-decay, 14-day. The six-model + custom-weights design recorded above is retained as the post-pilot full-product target, not offered during the pilot.]**
+**Attribution model and window — CLOSED for onboarding design, May 21 2026:** Full attribution model flexibility offered at onboarding across six models plus custom weights. Default: time decay, 14-day window. Default window of 14 days is a working assumption pending validation across remaining discovery interviews — if consistent founder data suggests a different default, update `client_config` default value only; the onboarding question and option set are locked. See Section 5 for full rationale.
 
 **Suppressed-leak weekly digest — CLOSED as a position 2026-06-02 (build sequenced to Gap 8 + Gap 9):** When a driver is suppressed (e.g. a seasonal CPM spike graded State 3, or an expected return-rate level from a high-return category), the suppressed magnitude is not discarded — it is surfaced to the founder in a periodic (weekly) digest that shows the **magnitude and the plain-English reason**, never the internal suppression mechanics or rule IDs, and gated by suppression confidence (a low-confidence suppression is not asserted to the founder as "expected"). The resolved position is that "suppressed" must never mean "invisible." This is distinct from — and complementary to — the still-open "explained ≠ can't act" question in the Still Open subsection below: that question is whether an *individual* suppressed driver surfaces an inline action; this digest is the separate mechanism for showing the running *magnitude* of what was suppressed. Build is sequenced, not open: the surfacing logic is inherited by D1 Gap 8, and the $-impact display is part of Gap 9. See cross_alert_orchestration.md O-19.
 
@@ -1360,7 +1354,7 @@ interview before next session.
 
 ### Still Open — Do Not Resolve Without New Evidence
 - **Paid-media baseline structural-break alert (agency change)** *(added 2026-05-31 — when an unprecedented, sustained, above-seasonal-norm shift in paid-media baselines is observed, surface the cost reality plus a question: "did something change on the media side — new agency, in-housed, restructure?" NOT agency detection; we never assert a change. NOT asked at onboarding (agencies churn). Founder-declared resolution primary; data-derived campaign-structure churn may prompt the question but never triggers a silent auto-reset. Reuses the Jan-12-2026 structural-break mechanism. Surface-ownership across paid-media alerts is a cross-alert orchestration item — see cross_alert_orchestration.md Cluster 2.)*
-- **Alert library canon reconciliation — E5/E6 (and any other non-Section-3D alerts)** *(added 2026-05-31 — E5 Deliverability Risk and E6 Klaviyo Revenue Seasonality exist in the seed-decision files with live suppression dependencies (E5 suppresses E1, D5 per S35; E5 is a critical/immediate-delivery alert per S34) but are absent from the Section 3D library, which lists only E1–E4. Reconcile: add to the library or align the seed files. E5 cannot be silently dropped — it has dependents. See cross_alert_orchestration.md P2-FINDING 4.)*
+- **Alert library canon reconciliation — E5/E6 (and any other non-Section-3D alerts)** *(added 2026-05-31 — E5 Deliverability Risk and E6 Klaviyo Revenue Seasonality exist in the seed-decision files with live suppression dependencies (E5 suppresses E1, D5 per S35; E5 is a critical/immediate-delivery alert per S34) but are absent from the Section 3D 41-type library, which lists only E1–E4. Reconcile: add to the library or align the seed files. E5 cannot be silently dropped — it has dependents. See cross_alert_orchestration.md P2-FINDING 4.)*
 - **Alert-numbering namespace convention** *(added 2026-05-31 — at least three colliding namespaces use the same labels: Section 3D alert IDs (A1=Post-Return ROAS), gap_abc_decisions.md seed *design decisions* (A1=BFCM Suppression Corrected), and seed-file extended numbering. "Check A6" is ambiguous across three meanings — a retrieval-error risk. Adopt a convention (e.g. ALERT-A6 / DEC-A6 / S-rule) in the consolidated doc pass. See cross_alert_orchestration.md P2-FINDING 5.)*
 - **Seasonal explanation vs. actionability ("explained ≠ can't act")** *(added 2026-05-31 from D1 Gap 4 — the suppression model (S38) goes quiet when a metric move is "explained away" by a calendar event, e.g. a BFCM CPM spike. But "explained" is not the same as "nothing to do": a seasonal CPM spike can still be actionable ("you're overspending into inflated ad prices; pull back"). D1 currently keeps the SKU-level spend-misallocation finding alive even under State-3 seasonal suppression, but the general question — should a seasonal-suppressed driver still surface an action — is unresolved. Inherited as a design input by D1 Gap 8 (no action named per driver). Product question, not only engineering. See agent_d_build_spec.md "GAP 4 — D1 CPM DIAGNOSIS CHAIN", Step 2. **UPDATED 2026-06-01 (D1 Gap 5 close):** the founder-driven category (ASP) shift case is confirmed to live HERE under this decision, not in Gap 5. The margin-weighted mix-shift driver already stays silent on margin-neutral ASP shifts; the case that genuinely compresses CM% is a founder-intended shift to a lower-margin category, which Gap 8 must decide (suppress vs fire-with-context). Gap 8 inherits three items logged at the Gap 5 close: a suppression hole (mix-shift checks promotion-driven but not spend-reallocation-driven shifts), a founder-vs-organic discriminator (spend-by-category / revenue-by-category co-movement), and a materiality floor. See agent_d_build_spec.md "GAP 5 — AOV DECLINE: RETIRED AS A D1 DRIVER" and cross_alert_orchestration.md O-19.)*
 - Exact Slack bot framework version and deployment platform
@@ -1417,6 +1411,6 @@ interview before next session.
 
 8. **Cross-source moment visible by minute 10.** Onboarding must produce a cross-source insight that Shopify Sidekick cannot replicate before the founder has completed setup. This is a product requirement enforced at the onboarding architecture level. (Added May 2026.)
 
-9. **Alert precision over alert volume.** The 58 validated alert types are the floor, not the ceiling. The self-extending graph adds new alert types only after per-client and cross-network validation thresholds are met. A new alert type that fires without validated causal chain is a rule engine output, not intelligence. Never add alert types to increase product comprehensiveness — add them because real outcome data validated a new causal chain.
+9. **Alert precision over alert volume.** The 41 validated alert types are the floor, not the ceiling. The self-extending graph adds new alert types only after per-client and cross-network validation thresholds are met. A new alert type that fires without validated causal chain is a rule engine output, not intelligence. Never add alert types to increase product comprehensiveness — add them because real outcome data validated a new causal chain.
 
 10. **Intellectual honesty in every alert.** Agent D communicates uncertainty in plain English on every alert — not just a confidence score number. A founder who sees the system acknowledge what it doesn't know trusts the system more than one that always projects false certainty. The Evidence Stack is a trust mechanism; pre-fire uncertainty communication is how that trust is earned alert by alert.
