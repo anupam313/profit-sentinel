@@ -6,14 +6,13 @@ for Shopify fashion brands ($1M-$10M GMV). Stack:
 Supabase (PostgreSQL) + Airbyte + dbt Cloud + LangGraph 
 + Slack Bolt SDK + Next.js.
 
-Read these three files before starting any task:
+Read these two files before starting any task:
 - docs/technical_architecture.md — authoritative source 
   for schema design, data flow, agent design, and the 
   nine agreed architectural changes
 - docs/product_strategy.md — ICP, five alerts, onboarding 
-  architecture
-- docs/blueprint.md — product vision and connector 
-  prioritisation framework
+  architecture, product vision, and connector 
+  prioritisation framework (§7)
 
 ## CURRENT BUILD STATE
 Check technical_architecture.md Section 10 (Build Sequence) 
