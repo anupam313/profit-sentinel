@@ -25,22 +25,32 @@ Current schema status:
 - public schema: application tables only (client_config, 
   alert_log, thread_context, source_schema_registry, 
   schema_versions, config_change_log)
-- client_azure_co: all Airbyte source tables + staging 
-  + mart tables
-- No other schemas exist yet
+- client_azure_co: Airbyte source tables + PS application 
+  tables (dbt var client_schema; macro base)
+- client_azure_co_staging: dbt staging models 
+  (+schema: staging)
+- client_azure_co_marts: dbt mart tables, incl. 
+  mart_causal_chain_daily (+schema: marts)
+- Schema names derive from generate_schema_name.sql: 
+  base = var('client_schema'); custom schemas append 
+  as {client_schema}_{custom}. No other schemas exist yet.
 
 ## RULE 1 — DISCOVERY BEFORE TRANSFORMATION
 Before writing any transformation logic, staging model, 
 or type cast, run this first:
 
 ```sql
+-- [target_schema] is one of: client_azure_co (sources + app
+-- tables), client_azure_co_staging (stg_* models), or
+-- client_azure_co_marts (mart_* tables). Pick the schema the
+-- table actually lives in — marts are NOT in client_azure_co.
 SELECT column_name, data_type 
 FROM information_schema.columns
-WHERE table_schema = 'client_azure_co' 
+WHERE table_schema = '[target_schema]' 
 AND table_name = '[target_table]'
 ORDER BY ordinal_position;
 
-SELECT * FROM client_azure_co.[target_table] LIMIT 5;
+SELECT * FROM [target_schema].[target_table] LIMIT 5;
 ```
 
 Never assume a column's data type. Check the 
