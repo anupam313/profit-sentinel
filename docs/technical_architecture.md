@@ -3458,145 +3458,154 @@ ALTER TABLE public.sku_cost_master
 
     ADD COLUMN IF NOT EXISTS founder_category
         text,
-    -- Category label in the founder's own vocabulary
-    -- Primary source: Shopify collection membership
-    -- Assignment rule: collection with fewest total SKUs
-    --   that this SKU belongs to (most specific collection)
-    -- Populated at onboarding by connectors/category_inference.py
-    -- This is the label used in all D1 alert output — never product_type
+    -- Founder-facing DISPLAY label ONLY — never the internal grouping key,
+    --   never product_type, never a Shopify collection used as a grouping key.
+    -- Display source: the resolved taxonomy-node label, optionally overridden
+    --   by a non-blocking founder rename. A Shopify collection may supply the
+    --   display label ONLY when verified categorical (never promotional, never
+    --   the default).
+    -- Populated by connectors/category_inference.py (onboarding backfill + ongoing).
 
     ADD COLUMN IF NOT EXISTS ai_inferred_category
         text,
-    -- AI-inferred category grouping (Claude API) — the INTERNAL grouping
-    --   basis for EVERY brand, regardless of collection coverage. Collection
-    --   coverage governs only which DISPLAY label is the default (collection
-    --   vs AI label), never whether AI clustering runs.
-    -- Claude API inference from: product title, tags, product_type,
-    --   vendor, collection membership
-    -- Stores Claude's inferred label. INTERNAL GROUPING USES THIS AI
-    --   CLUSTERING DIRECTLY — no founder rename is required to group or to
-    --   compute alerts. Founder rename is a DISPLAY GATE ONLY: the founder
-    --   may relabel the AI categories for founder-facing display, but rename
-    --   NEVER blocks internal grouping or alert computation.
-    --   (Retires the prior "mandatory founder rename step before any alert
-    --   uses this label".)
-    -- Per-SKU gating uses category_inference_confidence (see below). Below
-    --   threshold: fall back to product_type for INTERNAL grouping only,
-    --   NEVER as a founder-facing display label.
+    -- The LLM-inferred label when Step 0 (Shopify-assigned category) is absent —
+    --   produced by classifying the SKU and SNAPPING to a Shopify Standard
+    --   Taxonomy node (never free-text/invented). Internal grouping label when no
+    --   Shopify-assigned category exists.
+    -- Founder rename is a DISPLAY GATE ONLY: it NEVER blocks internal grouping or
+    --   alert computation.
+    --   (Retires the prior "AI clustering" basis and "mandatory founder rename".)
+
+    ADD COLUMN IF NOT EXISTS category_id
+        text,
+    -- RESOLVED Shopify Standard Taxonomy node gid this SKU is grouped at
+    --   (gid://shopify/TaxonomyCategory/<code>). Sourced from the Shopify-assigned
+    --   category on shopify_products (Step 0, GraphQL enrichment) when present,
+    --   else from the LLM snap. Upstream "unassigned" =
+    --   'gid://shopify/TaxonomyCategory/na' OR NULL → treated as no assignment.
+
+    ADD COLUMN IF NOT EXISTS category_full_name
+        text,
+    -- Resolved node breadcrumb path (e.g. "Apparel & Accessories > Shoes > Boots"),
+    --   paired with category_id; taxonomy level/depth derivable from the path.
 
     ADD COLUMN IF NOT EXISTS category_inference_confidence
         numeric,
-    -- REDEFINED (Gap 6): a cross-signal AGREEMENT score, NOT a raw model
-    --   self-reported probability. Measures how strongly the independent
-    --   signals (title, tags, product_type, vendor, collection membership)
-    --   agree on the SKU's category. Range 0.0–1.0.
-    -- Provisional threshold 0.70 (to be calibrated against real data).
-    -- NULL when category_source = 'collection' or 'manual'
+    -- Cross-signal semantic AGREEMENT score, NOT a raw model self-report. Measures
+    --   how strongly the qualified signals (description [STRONG], categorical
+    --   tags/collections, title, product_type [weak]) concur on the node. VENDOR is
+    --   NOT a signal (single-brand DTC). Range 0.0–1.0.
+    -- NO fixed threshold — the SKU is tagged at the DEEPEST taxonomy level where the
+    --   qualified signals concur (depth = confidence).
+    --   (Retires the "provisional threshold 0.70".)
+    -- NULL when category_source = 'shopify_assigned' or 'manual'.
 
     ADD COLUMN IF NOT EXISTS category_source
-        text default 'collection';
-    -- Tracks how founder_category was determined
+        text default 'shopify_assigned';
+    -- Tracks how the resolved node / founder_category was determined
     -- values:
-    --   collection  = from Shopify collection membership (primary)
-    --   ai_inferred = from category_inference.py (AI clustering; used for
-    --                 internal grouping without rename — rename is display-only)
-    --   manual      = founder manually assigned in onboarding UI
-    -- product_type retired as primary proxy — retained as AI inference
-    --   input only, never used directly as a display label
+    --   shopify_assigned = resolved from the Shopify-assigned category (Step 0)
+    --   ai_inferred      = LLM classification snapped to a taxonomy node (Step 0 absent)
+    --   manual           = founder relabelled the DISPLAY label in onboarding UI (display only)
+    -- product_type is NOT a source — retained as a weak AI-inference input and a
+    --   low-agreement internal-grouping fallback only, never a display label, never a key.
 ```
 
 ---
 
-### NEW ONBOARDING SCRIPT — connectors/category_inference.py
+### NEW SCRIPT — connectors/category_inference.py (onboarding backfill + ongoing)
 
-When it runs: onboarding Step 6, after historical_pattern_scan.py.
-Silent completion — internal grouping is automatic. The only founder-facing
-touch is an OPTIONAL display-label rename prompt (non-blocking).
+When it runs: onboarding Step 6 (backfill, after historical_pattern_scan.py)
+AND continuously on new/changed SKUs, so newly added products are grouped
+without a manual re-trigger. Silent completion — internal grouping is automatic.
+The only founder-facing touch is an OPTIONAL display-label rename (non-blocking).
 
 ```python
 # connectors/category_inference.py
-# Step 6 of onboarding — runs after historical_pattern_scan.py
+# Onboarding Step 6 (backfill) + ongoing on new/changed SKUs
 #
-# Inputs:  stg_shopify_products (title, product_type, tags, vendor)
+# Inputs:  stg_shopify_products (description [STRONG], title, product_type, tags)
+#          shopify_products.category_id / category_full_name (Step 0, GraphQL enrichment)
 #          shopify_collects / shopify_collection_products (collection membership)
-# Outputs: sku_cost_master.founder_category per active SKU
-#          sku_cost_master.ai_inferred_category (if AI path taken)
+#          NOTE: vendor is NOT used (single-brand DTC → COUNT(DISTINCT vendor) ≈ 1).
+# Outputs: sku_cost_master.category_id / category_full_name (resolved node)
+#          sku_cost_master.founder_category (display label) per active SKU
+#          sku_cost_master.ai_inferred_category (when Step 0 absent)
 #          sku_cost_master.category_inference_confidence
 #          sku_cost_master.category_source
 #
-# Logic:
-# 1. Query collection membership for all active SKUs
-# 2. Run AI clustering (Claude API: title, tags, product_type, vendor,
-#    collection membership) → ai_inferred_category per SKU.
-#    INTERNAL GROUPING USES THESE AI CLUSTERS DIRECTLY for EVERY brand,
-#    regardless of collection_coverage_rate. Collection-first internal
-#    grouping is OVERRIDDEN: collections in this segment are frequently
-#    promotional ("Bestsellers", "Sale", "New Arrivals") and are unsafe as
-#    grouping keys — a SEMANTIC problem that high collection coverage does
-#    NOT cure. Collection feeds the DISPLAY label only.
-#    → Write category_inference_confidence per SKU (cross-signal agreement)
-# 3. Assign the DISPLAY label founder_category (coverage governs the display
-#    choice ONLY — never whether AI clustering runs):
-#    → IF collection_coverage_rate >= 0.70:
-#        founder_category = collection with fewest total_skus that this SKU
-#        belongs to (most specific collection); category_source = 'collection'
-#    → ELSE:
-#        founder_category defaults to the ai_inferred_category label;
-#        category_source = 'ai_inferred'
-#    (Internal grouping remains the AI clusters in BOTH branches.)
+# Logic (per SKU):
+# 1. STEP 0 (primary): read the Shopify-assigned Standard Taxonomy category from
+#    shopify_products (category_id + category_full_name). If assigned
+#    (NOT 'gid://shopify/TaxonomyCategory/na' and NOT NULL) → resolve the SKU to
+#    that node; category_source = 'shopify_assigned'.
+# 2. FALLBACK (Step 0 absent): classify the SKU and SNAP to a Shopify Standard
+#    Taxonomy node (never free-text/invented). Signals are reliability-tiered,
+#    NOT equal-vote: description (STRONG) > categorical tags/collections
+#    (promo-filtered) > title, product_type (weak). Collections in this segment
+#    are frequently promotional ("Bestsellers", "Sale", "New Arrivals") and are
+#    unsafe as grouping keys — a SEMANTIC problem high coverage does NOT cure;
+#    a collection feeds the DISPLAY label only when verified categorical.
+#    category_source = 'ai_inferred'.
+#    → Write category_inference_confidence per SKU (cross-signal agreement).
+# 3. DEPTH: tag at the DEEPEST taxonomy level where the qualified signals concur
+#    (deepest-agreement; depth = confidence). NO fixed agreement threshold.
+#    Step-0 (merchant-assigned) depth is taken as-is; LLM depth self-limits to the
+#    deepest concurring level.
+# 4. DISPLAY label founder_category defaults to the resolved node label.
 #    → OPTIONAL display-rename prompt in onboarding checklist:
 #      "We've grouped your products into categories —
 #       do these names match how you think about your business?
 #       Rename any that don't." (display-only; non-blocking)
-#    → Founder-renamed labels refine the DISPLAY label only;
-#      category_source = 'manual'
-# 4. If founder skips/declines the optional display rename:
-#    → keep the AI labels for display; category_source stays 'ai_inferred'
-#    → internal grouping AND category-level D1 output PROCEED — rename is
-#      never a blocker
-#    → (Retires the prior "declined rename → category_source = manual
-#      (pending) → category-level D1 output suppressed for this client".)
-# 5. Confidence < 0.70 per SKU → fall back to product_type for
-#    internal grouping of that SKU only, but NEVER display as founder-facing
-#    label
+#    → Founder-renamed labels refine the DISPLAY label only; category_source = 'manual'.
+# 5. If founder skips/declines the rename:
+#    → keep the resolved node label for display; category_source unchanged
+#    → internal grouping AND category-level D1 output PROCEED — rename is never a blocker
+#    → (Retires the prior "declined rename → category-level D1 output suppressed".)
+# 6. product_type is used ONLY as a weak inference input and a low-agreement
+#    internal-grouping fallback for a SKU the signals cannot place — NEVER displayed,
+#    NEVER a key.
+# 7. Firing DEPTH per category is governed by AL-19 (see CATEGORY GROUPING +
+#    FIRING-DEPTH GATE below, and GATE D1-G3 in d1_validation_gates.md): fire at the
+#    finest level where AL-19 passes; roll up for volume carrying the AL-3/AL-29
+#    concentration down-drill; brand-level-with-disclosure as the never-silent floor.
+#    Grouping is SEMANTIC and is NEVER scored or re-split on return-rate behaviour.
 #
-# New SKUs post-onboarding: inherit the display label from collection if
-# available, else NULL until manual re-trigger of this script.
+# New/changed SKUs post-onboarding: the enrichment refreshes Step 0 and this script
+# re-resolves the node (Step 0 → LLM snap) automatically — no manual re-trigger.
 ```
 
 ---
 
-### CLUSTERING-QUALITY GATE (onboarding)
+### CATEGORY GROUPING + FIRING-DEPTH GATE (onboarding + ongoing)
 
-Runs at onboarding after category_inference.py assigns groupings. Decides
-whether D1 may operate at category granularity for this brand, or must fall
-back to brand level. Internal grouping is never blocked; this gate governs the
-*granularity* of D1 output, not whether D1 runs.
+Runs after category_inference.py resolves groupings. Governs the *granularity*
+of D1 output — never whether D1 runs (internal grouping is never blocked). Two
+distinct concerns, kept separate: grouping is semantic; firing depth is volume-gated.
 
 ```python
-# Score clustering quality by RETURN-RATE COHERENCE within clusters:
-#   for each inferred category, compute the dispersion of SKU-level
-#   return rates inside it. A good grouping has low within-cluster
-#   return-rate dispersion (SKUs grouped together behave alike on the
-#   one dimension D1 most depends on for the return-rate component).
-# 1. within_cluster_return_dispersion = median over categories of the
-#    IQR of SKU return_rate_pct within each category
-# 2. Compare to the brand-wide SKU return-rate IQR (the no-grouping baseline)
-# 3. coherence_score = 1 - (within_cluster_return_dispersion /
-#                          brand_wide_return_iqr)   # higher = better grouping
+# Grouping is SEMANTIC, not behavioural:
+#   SKUs are grouped by the resolved Shopify Standard Taxonomy node
+#   (Step 0 or LLM snap). Grouping is NEVER scored or re-split on return-rate
+#   behaviour — return concentration inside a genuine category is a FINDING,
+#   not evidence of a bad group.
+#   (Retires the prior "RETURN-RATE COHERENCE within clusters" coherence_score
+#    and the category_granularity_floor 0.30.)
 #
-# Per-brand granularity verdict:
-#   coherence_score >= category_granularity_floor (provisional 0.30,
-#     to be calibrated) → category-level D1 enabled for this brand
-#   below floor → BRAND-LEVEL-WITH-DISCLOSURE (explicit low-quality path):
-#     D1 operates at brand level only and discloses that per-category
-#     diagnosis was withheld because the catalogue did not cluster cleanly
-#     enough to trust category attribution. Never silently degrade — the
-#     disclosure is mandatory so the founder knows category granularity
-#     was not available, not merely absent.
+# Firing depth is governed by AL-19 (NOT by a clustering-quality score):
+# 1. D1 fires at the FINEST taxonomy level where AL-19 passes (enough volume
+#    for the level to be trusted).
+# 2. Where a finer level is too thin, roll up for volume AND carry the
+#    AL-3/AL-29 concentration down-drill, so a hot child SKU or sub-node is not
+#    masked by the rolled-up level.
+# 3. BRAND-LEVEL-WITH-DISCLOSURE is the floor (explicit low-quality path): when
+#    no category level passes AL-19, D1 operates at brand level and discloses
+#    that per-category diagnosis was withheld for want of volume. Never silently
+#    degrade — any degrade to a coarser level (incl. brand) with the level
+#    recorded but no disclosure surfaced is a FAIL (go-live gate D1-G3).
 #
-# Verdict stored on client_config (granularity flag) and re-scored at each
-# monthly incremental scan as catalogue/return data accumulate.
+# Firing-depth verdict is per category and re-evaluated at each monthly
+# incremental scan as catalogue/return volume accumulate.
 ```
 
 ---

@@ -97,35 +97,48 @@ suppression let A3 misfire.)
 
 ---
 
-## GATE D1-G3 — Clustering-quality gate sets Stage-1 granularity (no silent brand-level fallback)
-### Status: OPEN — blocked on the onboarding clustering-quality scorer + client_config granularity flag
-### Source: Gap 6 (clustering-quality gate); technical_architecture.md "CLUSTERING-QUALITY GATE (onboarding)"
+## GATE D1-G3 — Grouping is semantic; firing depth governed by AL-19 (no silent brand-level fallback)
+### Status: OPEN — blocked on the category_inference.py semantic-agreement scorer + the AL-19 firing-depth resolver
+### Source: Gap 6 + OP-1 close (2026-06-19); see technical_architecture.md category-inference / grouping spec
 
-**Why this gate exists.** D1's return-rate component depends on category grouping.
-If the AI clustering groups SKUs that do not behave alike on returns, category-level
-diagnosis is noise dressed as precision. The gate guards against the product silently
-degrading to brand-level without telling the founder — a silent degrade looks like
-"no category problem" when the truth is "we couldn't trust the categories."
+**Why this gate exists.** D1's return-rate component is reported per category, so the
+grouping it rests on must be trustworthy AND each reported level must have enough volume
+to be believed. Two failures are guarded: (a) grouping built on the wrong basis, and
+(b) the product silently degrading to a coarser level without telling the founder — a
+silent degrade reads as "no category problem" when the truth is "we couldn't report at
+that level."
 
 **PASS criteria — ALL must hold:**
-1. At onboarding, clustering quality is scored on **return-rate coherence within
-   clusters** (within-cluster SKU return-rate dispersion vs the brand-wide
-   no-grouping baseline).
-2. The score produces an explicit **per-brand granularity verdict** stored on
-   `client_config`: category-granular **or** brand-level-with-disclosure.
-3. When the verdict is brand-level, D1 operates at brand level **and emits the
-   disclosure** that per-category diagnosis was withheld because the catalogue did
-   not cluster cleanly enough to trust category attribution.
-4. The brand-level path is **never silent**: a brand-level run with the granularity
-   verdict set but no disclosure surfaced is a FAIL.
+1. Grouping is **semantic** — SKUs are assigned to Shopify Standard Taxonomy nodes by
+   cross-signal agreement (snap-to-taxonomy), **never** scored or re-split on return-rate
+   behaviour. (Retires "return-rate coherence within clusters": return concentration
+   inside a genuine category is a finding, not evidence of a bad group.)
+2. Grouping confidence is the **semantic cross-signal agreement** among qualified signals;
+   the SKU is tagged at the **deepest taxonomy level where those signals concur**. No
+   fixed agreement threshold.
+3. **Firing depth is governed by AL-19, not by grouping.** D1 fires at the finest taxonomy
+   level where AL-19 passes; where a finer level is too thin, it rolls up for volume **and
+   carries the AL-3/AL-29 concentration down-drill** so a hot child SKU or sub-node is not
+   masked by the rolled-up level.
+4. **Brand-level-with-disclosure is the floor, never silent.** When no category level
+   passes AL-19, D1 operates at brand level **and emits the disclosure** that per-category
+   diagnosis was withheld for want of volume. Any degrade to a coarser level (incl. brand)
+   with the level recorded but no disclosure surfaced is a FAIL.
 
-**FAIL by construction (the thing this gate guards against):**
-- D1 returns a brand-level result with no granularity verdict recorded, or with a
-  brand-level verdict but no founder-facing disclosure — i.e. a silent degrade.
+**FAIL by construction (the things this gate guards against):**
+- Grouping or firing depth decided on return-rate behaviour (the retired basis).
+- A degrade to a coarser level with the level recorded but **no founder-facing
+  disclosure** — i.e. a silent degrade.
+- A roll-up that drops the AL-3/AL-29 concentration down-drill (masking a hot child).
 
 **Unblock requirement (BATCHED — post-H, no code now):**
-- Onboarding clustering-quality scorer + `client_config` granularity flag + the
-  brand-level disclosure string. Stays in the batched post-H queue.
+- category_inference.py deepest-concurring-level resolver + the AL-19 firing-depth
+  resolver + the roll-up / brand-level disclosure string. Stays in the batched post-H queue.
+
+**[2026-06-19 OP-1 close]** Retired the return-rate-coherence clustering-quality basis and
+the binary category-vs-brand verdict; grouping is now semantic (snap-to-taxonomy), firing
+depth governed by AL-19 with roll-up + concentration down-drill, brand-level-with-disclosure
+as the floor.
 
 ---
 
@@ -203,7 +216,7 @@ supplier-credit window — the exact failure D1-G1 protects against.
 **PASS criteria — the softener is FORBIDDEN if ANY one holds:**
 1. Dominant return reason is quality/defect (Loop reason / Gorgias text).
 2. **Level** — return residual in the far upper tail of the GROUP's own historical band
-   (own-band method, finest clustering-certified granularity; NOT blended brand average,
+   (own-band method, finest semantically-confident taxonomy level; NOT blended brand average,
    NOT a fixed pp / fixed ×).
 3. **Exposure** — units / margin $ at risk cross the upper end of the brand's materiality
    band.

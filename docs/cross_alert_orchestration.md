@@ -300,6 +300,13 @@ alert week.
   sizes, founder actions, outcomes) so its dials — band, roll-up grain, readable-
   cohort minimum — are settable from beta evidence, not guessed; ship the skeleton
   deterministic with the dials tagged "calibrate from logged data."
+- **[OP-1 close 2026-06-19] forward note (the C3 reconcile in (a)–(c) above stays OPEN —
+  this does NOT resolve it).** D1's per-category baseline referenced in (a) was redefined
+  this session; see GATE D1-G3 (d1_validation_gates.md) and the "CATEGORY GROUPING +
+  FIRING-DEPTH GATE" (technical_architecture.md) for the authoritative definition. When C3
+  is wired to "the same baseline D1 uses" at the C-series review, it inherits D1's CURRENT
+  definition there, not any earlier basis. In the shared roll-up grain, "category" = the
+  resolved taxonomy node.
 - **Size-guide / photography brand-action return events — shared handling (added
   2026-06-03).** D1's return component now consults active `brand_event_calendar` rows
   of `size_guide_update` / `photography_update` and applies the row's
