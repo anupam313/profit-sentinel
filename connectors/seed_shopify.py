@@ -31,6 +31,7 @@ import logging
 import os
 import random
 import sys
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -131,6 +132,66 @@ COLORS_BY_CAT = {
     'MENS':      ['White', 'Navy', 'Olive', 'Black', 'Stone'],
 }
 
+# ─── Standard Product Taxonomy (synthetic seed) ───────────────────────────────
+# Real gids + breadcrumbs from Shopify's Standard Product Taxonomy, Apparel &
+# Accessories vertical (sourced from data/shopify_taxonomy/categories.json).
+# Baked here as constants so the seed has NO runtime dependency on the ~80 MB
+# taxonomy file (that file is a gitignored reference asset, also used by the
+# GraphQL real-data path).
+#
+# Coverage is DELIBERATELY not production's ~12%: ~40% of synthetic rows get a
+# genuine apparel node (matched to product_type where sensible), ~60% stay
+# cleanly NULL to exercise the LLM classify-and-snap fallback. The 'na'
+# Uncategorized sentinel is for READING real Shopify data only — never seeded.
+_TAXONOMY_PREFIX = 'gid://shopify/TaxonomyCategory/'
+
+# product_type (lowercase) -> (category_id gid, category_full_name breadcrumb)
+TAXONOMY_BY_PRODUCT_TYPE: dict[str, tuple[str, str]] = {
+    'top':       (_TAXONOMY_PREFIX + 'aa-1-13',    'Apparel & Accessories > Clothing > Clothing Tops'),
+    'dress':     (_TAXONOMY_PREFIX + 'aa-1-4',     'Apparel & Accessories > Clothing > Dresses'),
+    'short':     (_TAXONOMY_PREFIX + 'aa-1-14',    'Apparel & Accessories > Clothing > Shorts'),
+    'knit':      (_TAXONOMY_PREFIX + 'aa-1-13-12', 'Apparel & Accessories > Clothing > Clothing Tops > Sweaters'),
+    'outerwear': (_TAXONOMY_PREFIX + 'aa-1-10-2',  'Apparel & Accessories > Clothing > Outerwear > Coats & Jackets'),
+    'denim':     (_TAXONOMY_PREFIX + 'aa-1-12-4',  'Apparel & Accessories > Clothing > Pants > Jeans'),
+    'formal':    (_TAXONOMY_PREFIX + 'aa-1-19',    'Apparel & Accessories > Clothing > Suits'),
+}
+
+# Fallback pool for product_types with no sensible direct match (e.g. 'mens').
+TAXONOMY_APPAREL_POOL: list[tuple[str, str]] = [
+    (_TAXONOMY_PREFIX + 'aa-1-13',   'Apparel & Accessories > Clothing > Clothing Tops'),
+    (_TAXONOMY_PREFIX + 'aa-1-13-7', 'Apparel & Accessories > Clothing > Clothing Tops > Shirts'),
+    (_TAXONOMY_PREFIX + 'aa-1-13-8', 'Apparel & Accessories > Clothing > Clothing Tops > T-Shirts'),
+    (_TAXONOMY_PREFIX + 'aa-1-12',   'Apparel & Accessories > Clothing > Pants'),
+    (_TAXONOMY_PREFIX + 'aa-1-15',   'Apparel & Accessories > Clothing > Skirts'),
+    (_TAXONOMY_PREFIX + 'aa-1-10',   'Apparel & Accessories > Clothing > Outerwear'),
+    (_TAXONOMY_PREFIX + 'aa-1-19',   'Apparel & Accessories > Clothing > Suits'),
+    (_TAXONOMY_PREFIX + 'aa-1-1',    'Apparel & Accessories > Clothing > Activewear'),
+]
+
+SYNTHETIC_CATEGORY_FRACTION = 0.40  # ~40% categorized, ~60% NULL (test-coverage split)
+
+
+def assign_synthetic_category(product_id: int, product_type: str) -> tuple[str | None, str | None]:
+    """Deterministically assign a Standard Taxonomy category to a synthetic product.
+
+    Returns (category_id, category_full_name) or (None, None).
+
+    Deterministic and idempotent: keyed solely on product_id, so fresh re-seeds
+    and repeat backfill passes reproduce the exact same split (never double-apply
+    a different value). Uses an independent Random(product_id) so it does NOT draw
+    from the global PY_RNG stream and cannot perturb any other seeded value.
+    ~40% of rows get a genuine apparel node (matched to product_type when a
+    sensible mapping exists, else a random apparel node); ~60% stay NULL.
+    """
+    rng = random.Random(product_id)
+    if rng.random() >= SYNTHETIC_CATEGORY_FRACTION:
+        return (None, None)  # ~60%: no category -> exercises the LLM fallback
+    ptype = (product_type or '').lower()
+    if ptype in TAXONOMY_BY_PRODUCT_TYPE:
+        return TAXONOMY_BY_PRODUCT_TYPE[ptype]
+    return rng.choice(TAXONOMY_APPAREL_POOL)  # e.g. 'mens' -> random apparel node
+
+
 # ─── Payment gateway mix ──────────────────────────────────────────────────────
 # Before Month 10 (Mar 2025): 80% credit card, 10% Shop Pay, 10% other
 # Month 10+ BNPL introduced, gradual shift to 65% CC / 25% BNPL / 10% Shop Pay by Y2 end
@@ -182,6 +243,13 @@ def airbyte_ts(d: date) -> datetime:
     return datetime(d.year, d.month, d.day + 1 if d.day < 28 else d.day,
                     3, 0, 0, tzinfo=timezone.utc)
 
+def airbyte_meta_cols(extracted_at: datetime) -> tuple:
+    """Return the four required Airbyte metadata values for a raw table row.
+
+    Column order: _airbyte_raw_id, _airbyte_extracted_at, _airbyte_meta, _airbyte_generation_id
+    """
+    return (str(uuid.uuid4()), extracted_at, '{}', 0)
+
 def utc_dt(d: date, hour: int = 14, minute: int = 0) -> datetime:
     return datetime(d.year, d.month, d.day, hour, minute, 0, tzinfo=timezone.utc)
 
@@ -193,11 +261,12 @@ def get_conn() -> psycopg2.extensions.connection:
         sys.exit(1)
     return psycopg2.connect(url, sslmode='require')
 
-def batch_insert(cur, table: str, cols: list[str], rows: list[tuple], batch: int = 500) -> int:
+def batch_insert(cur, table: str, cols: list[str], rows: list[tuple], batch: int = 500, conflict_col: str = None) -> int:
     """Insert rows in batches using execute_values. Returns total rows inserted."""
     if not rows:
         return 0
-    sql = f'INSERT INTO {SCHEMA}.{table} ({", ".join(cols)}) VALUES %s ON CONFLICT DO NOTHING'
+    conflict_clause = f'ON CONFLICT ({conflict_col}) DO NOTHING' if conflict_col else 'ON CONFLICT DO NOTHING'
+    sql = f'INSERT INTO {SCHEMA}.{table} ({", ".join(cols)}) VALUES %s {conflict_clause}'
     total = 0
     for i in range(0, len(rows), batch):
         chunk = rows[i: i + batch]
@@ -240,7 +309,7 @@ def weeks_in_range(start: date, end: date):
 #   Return rate → Net revenue: -0.68 (via return_rate_idx)
 #   Klaviyo open → repeat purchase: +0.43
 
-CORR_MATRIX = np.array([
+_CORR_MATRIX_DESIGN = np.array([
     # ga4   cpm   ret   kla   ord
     [1.00, -0.30,  0.20,  0.43,  0.76],  # ga4_idx
     [-0.30,  1.00, -0.15, -0.20, -0.45],  # cpm_idx (high CPM → fewer orders)
@@ -248,6 +317,43 @@ CORR_MATRIX = np.array([
     [0.43, -0.20,  0.10,  1.00,  0.38],  # klaviyo_open_idx
     [0.76, -0.45, -0.55,  0.38,  1.00],  # orders_idx
 ], dtype=float)
+
+def _nearest_pd_corr(m: np.ndarray, eps: float = 1e-4) -> np.ndarray:
+    """Return the nearest positive-definite correlation matrix to m.
+
+    Method: eigenvalue clipping (set any eigenvalue < eps to eps),
+    reconstruct, re-symmetrise, then scale via congruence transformation
+    (divide each entry by sqrt(diag[i]) * sqrt(diag[j])) to restore the
+    unit diagonal.  Congruence scaling preserves positive definiteness;
+    naively setting np.fill_diagonal(m, 1.0) does not.
+    """
+    vals, vecs = np.linalg.eigh(m)
+    vals_clipped = np.maximum(vals, eps)
+    pd = vecs @ np.diag(vals_clipped) @ vecs.T
+    pd = (pd + pd.T) / 2                     # numerical symmetry
+    d = np.sqrt(np.diag(pd))
+    pd = pd / np.outer(d, d)                 # congruence scale -> unit diagonal, PD preserved
+    return pd
+
+CORR_MATRIX = _nearest_pd_corr(_CORR_MATRIX_DESIGN)
+
+# Print original vs adjusted so the operator can review what changed
+_LABELS = ['ga4_idx', 'cpm_idx', 'ret_idx', 'kla_idx', 'ord_idx']
+print('\n=== CORR_MATRIX: original design ===')
+print(f"{'':12s}" + ''.join(f'{l:>10s}' for l in _LABELS))
+for i, row in enumerate(_CORR_MATRIX_DESIGN):
+    print(f'{_LABELS[i]:12s}' + ''.join(f'{v:10.4f}' for v in row))
+print('\n=== CORR_MATRIX: nearest PD (used for Cholesky) ===')
+print(f"{'':12s}" + ''.join(f'{l:>10s}' for l in _LABELS))
+for i, row in enumerate(CORR_MATRIX):
+    print(f'{_LABELS[i]:12s}' + ''.join(f'{v:10.4f}' for v in row))
+print('\n=== Eigenvalues: original -> clipped ===')
+_orig_vals = np.linalg.eigh(_CORR_MATRIX_DESIGN)[0]
+_new_vals  = np.linalg.eigh(CORR_MATRIX)[0]
+for o, n in zip(_orig_vals, _new_vals):
+    flag = ' ** CLIPPED' if o < 1e-6 else ''
+    print(f'  {o:10.6f}  ->  {n:10.6f}{flag}')
+print()
 
 def generate_weekly_signals(n_weeks: int) -> np.ndarray:
     """Generate correlated weekly noise multipliers for n_weeks.
@@ -575,11 +681,14 @@ def seed_sku_master(cur) -> None:
                 PRODUCTS.append({'id': product_id, 'sku': sku_code, 'category': cat,
                                  'title': title, 'price': price, 'launch_date': launch_date})
 
+                _ats = airbyte_ts(launch_date)
+                _cat_id, _cat_full = assign_synthetic_category(product_id, cat.lower())
                 product_rows.append((
+                    *airbyte_meta_cols(_ats),
                     product_id, title, cat.lower(), 'active',
                     utc_dt(launch_date),
                     f'azure-co,{cat.lower()}',
-                    True, airbyte_ts(launch_date),
+                    _cat_id, _cat_full,
                 ))
 
                 for size in SIZES:
@@ -590,12 +699,13 @@ def seed_sku_master(cur) -> None:
                     VARIANTS.append(v)
                     SKU_TO_VARIANTS.setdefault(sku_code, []).append(v)
 
+                    _ats = airbyte_ts(launch_date)
                     variant_rows.append((
+                        *airbyte_meta_cols(_ats),
                         variant_id, product_id, sku_code,
                         size, f'{title} / {size}',
                         str(price), 250,
                         spec['weight_g'],
-                        True, airbyte_ts(launch_date),
                     ))
 
                     is_finaloop   = PY_RNG.random() < 0.75
@@ -616,13 +726,15 @@ def seed_sku_master(cur) -> None:
                 })
 
         n = batch_insert(cur, 'shopify_products',
-            ['id', 'title', 'product_type', 'status', 'created_at', 'tags',
-             'is_synthetic', '_airbyte_extracted_at'], product_rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'title', 'product_type', 'status', 'created_at', 'tags',
+             'category_id', 'category_full_name'], product_rows)
         logger.info('seed_sku_master | shopify_products: %d rows', n)
 
         n = batch_insert(cur, 'shopify_product_variants',
-            ['id', 'product_id', 'sku', 'title', 'name', 'price',
-             'inventory_quantity', 'weight', 'is_synthetic', '_airbyte_extracted_at'],
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'product_id', 'sku', 'title', 'display_name', 'price',
+             'inventory_quantity', 'weight'],
             variant_rows)
         logger.info('seed_sku_master | shopify_product_variants: %d rows', n)
 
@@ -714,22 +826,20 @@ def seed_customers(cur) -> None:
             if is_deleted:
                 deleted_at = utc_dt(created_date + timedelta(days=PY_RNG.randint(30, 180)))
 
+            _ats = airbyte_ts(created_date)
             customer_rows.append((
+                *airbyte_meta_cols(_ats),
                 synthetic_id,
                 utc_dt(created_date),
                 orders_count, str(total_spent),
                 None if is_deleted else synth_email,
                 'azure-co-customer',
-                is_deleted, deleted_at,
-                True, airbyte_ts(created_date),
             ))
 
             pii_rows.append((
-                synthetic_id,
-                f'Cust{synthetic_id:08d}',
-                synth_email,
-                acq_channel,
-                str(created_date),
+                str(synthetic_id),
+                synth_email,  # hashed_email — synthetic addr, no real PII
+                False,        # klaviyo_match_flag default
             ))
 
             CUSTOMERS.append({
@@ -744,14 +854,12 @@ def seed_customers(cur) -> None:
         PY_RNG.shuffle(CUST_ID_POOL)
 
         n = batch_insert(cur, 'shopify_customers',
-            ['id', 'created_at', 'orders_count', 'total_spent', 'email', 'tags',
-             'gdpr_deletion_marker', 'gdpr_deleted_at',
-             'is_synthetic', '_airbyte_extracted_at'], customer_rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'created_at', 'orders_count', 'total_spent', 'email', 'tags'], customer_rows)
         logger.info('seed_customers | shopify_customers: %d rows', n)
 
-        n = batch_insert_public(cur, 'synthetic_customer_pii_lookup',
-            ['synthetic_customer_id', 'synthetic_name', 'synthetic_email',
-             'acquisition_channel', 'created_date'], pii_rows)
+        n = batch_insert(cur, 'synthetic_customer_pii_lookup',
+            ['synthetic_customer_id', 'hashed_email', 'klaviyo_match_flag'], pii_rows)
         logger.info('seed_customers | synthetic_customer_pii_lookup: %d rows', n)
 
         MANIFEST['customer_ids'] = [c['id'] for c in CUSTOMERS[:5000]]
@@ -899,7 +1007,10 @@ def seed_orders(cur) -> dict[str, list[int]]:
                         cust_id = CUST_ID_POOL[cust_pool_idx % len(CUST_ID_POOL)]
                         cust_pool_idx += 1
                     else:
-                        cust_id = PY_RNG.choice(CUST_ID_POOL[max(0, cust_pool_idx - 2000): cust_pool_idx + 1])
+                        _pool_end = min(cust_pool_idx + 1, len(CUST_ID_POOL))
+                        _pool_start = max(0, _pool_end - 2000)
+                        _pool_slice = CUST_ID_POOL[_pool_start:_pool_end]
+                        cust_id = PY_RNG.choice(_pool_slice if _pool_slice else CUST_ID_POOL)
                 else:
                     cust_id = 10_000_001
 
@@ -997,13 +1108,13 @@ def seed_orders(cur) -> dict[str, list[int]]:
             MANIFEST['orders_by_week'][iso_week] = orders_by_week[iso_week][:20]  # first 20 per week
 
         n = batch_insert(cur, 'shopify_orders',
-            ['id', 'created_at', 'order_number', 'total_line_items_price',
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'created_at', 'order_number', 'total_line_items_price',
              'total_discounts', 'total_shipping_price_set', 'total_tax',
              'total_price', 'financial_status', 'fulfillment_status',
              'source_name', 'customer', 'tags', 'cancelled_at', 'email',
-             'payment_gateway', 'currency', 'note_attributes', 'landing_site',
-             'referring_site', 'note',
-             'is_synthetic', '_airbyte_extracted_at'], order_rows)
+             'payment_gateway_names', 'currency', 'note_attributes', 'landing_site',
+             'referring_site', 'note'], order_rows)
         logger.info('seed_orders | shopify_orders: %d rows', n)
 
         # Inventory levels snapshot (current state)
@@ -1012,13 +1123,15 @@ def seed_orders(cur) -> dict[str, list[int]]:
         for sku_code, variants in SKU_TO_VARIANTS.items():
             for v in variants:
                 qty = max(0, sku_inventory.get(sku_code, 250) // 5)
+                _ats = airbyte_ts(SEED_END)
                 inv_rows_final.append((
+                    *airbyte_meta_cols(_ats),
                     v['variant_id'], location_id, qty,
-                    utc_dt(SEED_END), True, airbyte_ts(SEED_END),
+                    utc_dt(SEED_END),
                 ))
         n = batch_insert(cur, 'shopify_inventory_levels',
-            ['inventory_item_id', 'location_id', 'available', 'updated_at',
-             'is_synthetic', '_airbyte_extracted_at'], inv_rows_final)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'inventory_item_id', 'location_id', 'available', 'updated_at'], inv_rows_final)
         logger.info('seed_orders | shopify_inventory_levels: %d rows', n)
 
         return orders_by_week
@@ -1047,7 +1160,9 @@ def _build_order_row(
     ])
     # Synthetic email (never real PII)
     email = f'cust_{customer_id}@synthetic.azureco.invalid'
+    _ats = airbyte_ts(d)
     return (
+        *airbyte_meta_cols(_ats),
         order_id,
         created_dt,
         order_number,
@@ -1063,14 +1178,12 @@ def _build_order_row(
         tags,
         None,          # cancelled_at
         email,
-        payment_gateway,
+        json.dumps([payment_gateway]),  # payment_gateway_names (jsonb array)
         currency,
         note_attrs,
         f'https://azureco.com/?utm_source={utm_source or ""}',
         f'https://{utm_source or "direct"}.com' if utm_source else None,
         note,
-        True,
-        airbyte_ts(d),
     )
 
 
@@ -1105,7 +1218,7 @@ def seed_line_items(cur, orders_by_week: dict[str, list[int]]) -> dict[int, list
 
         for iso_week, order_ids in orders_by_week.items():
             # Determine week date from iso_week string
-            wk_date = date.fromisoformat(iso_week[:4] + '-W' + iso_week[5:] + '-1') \
+            wk_date = date.fromisoformat(iso_week + '-1') \
                       if len(iso_week) == 8 else SEED_START
 
             for order_id in order_ids:
@@ -1142,14 +1255,15 @@ def seed_line_items(cur, orders_by_week: dict[str, list[int]]) -> dict[int, list
                     price = float(v['price'])
                     li_id = next_id(_LINE_ITEM_ID_COUNTER)
 
+                    _ats = airbyte_ts(wk_date)
                     line_item_rows.append((
+                        *airbyte_meta_cols(_ats),
                         li_id, order_id, v['product_id'], v['variant_id'],
                         v.get('title', sku_code)[:120],
                         sku_code,
                         1,           # quantity
                         str(price),
                         str(price),  # total_discount (per item)
-                        True, airbyte_ts(wk_date),
                     ))
                     skus_for_order.append(sku_code)
 
@@ -1162,9 +1276,9 @@ def seed_line_items(cur, orders_by_week: dict[str, list[int]]) -> dict[int, list
                 order_to_skus[order_id] = skus_for_order
 
         n = batch_insert(cur, 'shopify_order_line_items',
-            ['id', 'order_id', 'product_id', 'variant_id', 'title', 'sku',
-             'quantity', 'price', 'total_discount',
-             'is_synthetic', '_airbyte_extracted_at'], line_item_rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'order_id', 'product_id', 'variant_id', 'title', 'sku',
+             'quantity', 'price', 'total_discount'], line_item_rows)
         logger.info('seed_line_items | shopify_order_line_items: %d rows', n)
         return order_to_skus
 
@@ -1225,9 +1339,7 @@ def seed_refunds(cur, orders_by_week: dict[str, list[int]],
         all_dates_map: dict[str, date] = {}
         for iso_week in orders_by_week:
             try:
-                wk_date = date.fromisoformat(
-                    iso_week[:4] + '-W' + iso_week[5:] + '-1'
-                )
+                wk_date = date.fromisoformat(iso_week + '-1')
             except ValueError:
                 wk_date = SEED_START
             all_dates_map[iso_week] = wk_date
@@ -1251,20 +1363,17 @@ def seed_refunds(cur, orders_by_week: dict[str, list[int]],
                 # Approximate refund amount as ~AOV * (1 item)
                 refund_amount = round(PY_RNG.uniform(60, 180), 2)
 
+                _ats = airbyte_ts(refund_dt.date())
                 refund_rows.append((
+                    *airbyte_meta_cols(_ats),
                     refund_id, order_id,
                     refund_dt,
                     reason,
-                    str(refund_amount),
-                    str(0),   # shipping_refunded
-                    'customer',  # refund_type
-                    True, airbyte_ts(refund_dt.date()),
                 ))
 
         n = batch_insert(cur, 'shopify_order_refunds',
-            ['id', 'order_id', 'created_at', 'note',
-             'total_refunded', 'shipping_refunded', 'refund_type',
-             'is_synthetic', '_airbyte_extracted_at'], refund_rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'order_id', 'created_at', 'note'], refund_rows)
         logger.info('seed_refunds | shopify_order_refunds: %d rows', n)
 
     except Exception as e:
@@ -1285,7 +1394,7 @@ def seed_fulfillments(cur, orders_by_week: dict[str, list[int]]) -> None:
 
         for iso_week, order_ids in orders_by_week.items():
             try:
-                wk_date = date.fromisoformat(iso_week[:4] + '-W' + iso_week[5:] + '-1')
+                wk_date = date.fromisoformat(iso_week + '-1')
             except ValueError:
                 wk_date = SEED_START
 
@@ -1298,16 +1407,17 @@ def seed_fulfillments(cur, orders_by_week: dict[str, list[int]]) -> None:
                 carrier = PY_RNG.choice(carriers)
                 tracking = f'{carrier[:2].upper()}{PY_RNG.randint(100_000_000, 999_999_999)}'
 
+                _ats = airbyte_ts(ful_date)
                 rows.append((
+                    *airbyte_meta_cols(_ats),
                     ful_id, order_id, 'success',
                     utc_dt(ful_date), tracking, carrier,
-                    True, airbyte_ts(ful_date),
                 ))
 
         n = batch_insert(cur, 'shopify_fulfillments',
-            ['id', 'order_id', 'status', 'created_at',
-             'tracking_number', 'tracking_company',
-             'is_synthetic', '_airbyte_extracted_at'], rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'order_id', 'status', 'created_at',
+             'tracking_number', 'tracking_company'], rows)
         logger.info('seed_fulfillments | shopify_fulfillments: %d rows', n)
 
     except Exception as e:
@@ -1339,17 +1449,18 @@ def seed_discount_codes(cur) -> None:
         ]
         rows = []
         for code, code_type, value, created_date in codes:
+            _ats = airbyte_ts(created_date)
             rows.append((
+                *airbyte_meta_cols(_ats),
                 PY_RNG.randint(100_000, 999_999),
-                code, code_type, value,
+                code,
                 PY_RNG.randint(50, 500),  # usage_count
                 utc_dt(created_date),
-                True, airbyte_ts(created_date),
             ))
 
         n = batch_insert(cur, 'shopify_discount_codes',
-            ['id', 'code', 'value_type', 'value', 'usage_count',
-             'created_at', 'is_synthetic', '_airbyte_extracted_at'], rows)
+            ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
+             'id', 'code', 'usage_count', 'created_at'], rows)
         logger.info('seed_discount_codes | shopify_discount_codes: %d rows', n)
 
     except Exception as e:
@@ -1388,7 +1499,7 @@ def seed_touchpoint_journeys(cur, orders_by_week: dict[str, list[int]]) -> None:
 
         for iso_week, order_ids in orders_by_week.items():
             try:
-                wk_date = date.fromisoformat(iso_week[:4] + '-W' + iso_week[5:] + '-1')
+                wk_date = date.fromisoformat(iso_week + '-1')
             except ValueError:
                 wk_date = SEED_START
 
@@ -1620,7 +1731,7 @@ def seed_brand_event_calendar(cur) -> None:
             'TikTok Organic Reach Recovery', 'platform_algorithm_change',
             date(2024, 1, 13), date(2024, 6, 30),
             suppress=['B3'],
-            context_explanation='TikTok organic reach recovering â€” B3 suppressed until full recovery.',
+            ctx_explanation='TikTok organic reach recovering - B3 suppressed until full recovery.',
         ))
         # â”€â”€ TikTok algorithm change Q3 2024 (C12) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         rows.append(evt(
@@ -1994,10 +2105,8 @@ def seed_alert_log(cur) -> None:
                   suppressed=False, suppression_category=None,
                   fatigue_period=False, fatigue_reason=None,
                   outcome_confirmed=None, dismissal_correct=None):
-            aid = alert_id_counter[0]
-            alert_id_counter[0] += 1
             return (
-                aid, client_id, alert_type,
+                client_id, alert_type,
                 fired_at,
                 should_fire, confidence,
                 signal_value, threshold_value, threshold_direction,
@@ -2011,8 +2120,8 @@ def seed_alert_log(cur) -> None:
             )
 
         cols = [
-            'id', 'client_id', 'alert_type', 'fired_at',
-            'should_fire', 'confidence',
+            'client_id', 'alert_type', 'fired_at',
+            'should_fire', 'confidence_score',
             'signal_value', 'threshold_value', 'threshold_direction',
             'layer1_headline', 'layer2_context', 'layer3_precedent',
             'alert_instance_number', 'escalation_level',
@@ -2417,31 +2526,29 @@ def validate_seed(cur) -> list[dict]:
             logger.error('VALIDATE ERROR | %s: %s', name, e)
             return False
 
-    # Check 1: Total order count in expected range (18,000â€“28,000)
-    check('Order count in range 18K-28K',
-          f'SELECT COUNT(*) FROM {SCHEMA}.shopify_orders WHERE is_synthetic = true',
-          lambda n: n is not None and 18_000 <= n <= 28_000)
+    # Check 1: Total order count in expected range (75,000-95,000)
+    check('Order count in range 75K-95K',
+          f'SELECT COUNT(*) FROM {SCHEMA}.shopify_orders',
+          lambda n: n is not None and 75_000 <= n <= 95_000)
 
-    # Check 2: All orders have is_synthetic = true
-    check('No non-synthetic orders',
-          f'SELECT COUNT(*) FROM {SCHEMA}.shopify_orders WHERE is_synthetic = false',
-          lambda n: n == 0)
+    # Check 2: Orders table non-empty (is_synthetic removed from raw tables per DEBT-006)
+    check('Orders table non-empty',
+          f'SELECT COUNT(*) FROM {SCHEMA}.shopify_orders',
+          lambda n: n is not None and n > 0)
 
     # Check 3: Three locked SKUs have low sell-through (combined < 400 orders pre-May 2025)
     check('Locked SKU overstock â€” combined orders < 400 before May 2025',
           f"""SELECT COUNT(*) FROM {SCHEMA}.shopify_order_line_items li
               JOIN {SCHEMA}.shopify_orders o ON o.id = li.order_id
               WHERE li.sku IN ('AZ-TOP-088','AZ-DRESS-094','AZ-SHORT-031')
-              AND o.created_at < '2025-05-01'
-              AND li.is_synthetic = true""",
+              AND o.created_at < '2025-05-01'""",
           lambda n: n is not None and n < 400)
 
     # Check 4: BFCM Y1 Nov 2024 orders are 3x baseline (Nov should be highest month)
     check('BFCM Y1 Nov 2024 is highest revenue month',
           f"""SELECT date_trunc('month', created_at) AS mo, COUNT(*) as n
               FROM {SCHEMA}.shopify_orders
-              WHERE is_synthetic = true
-              AND created_at >= '2024-06-01' AND created_at < '2025-06-01'
+              WHERE created_at >= '2024-06-01' AND created_at < '2025-06-01'
               GROUP BY 1 ORDER BY 2 DESC LIMIT 1""",
           lambda row: True,  # just checking it runs
           critical=False)
@@ -2465,7 +2572,7 @@ def validate_seed(cur) -> list[dict]:
     # Check 7: Touchpoint journeys exist for 25-55% of orders
     check('Touchpoint journeys 25-55% of orders',
           f"""SELECT ROUND(100.0 * COUNT(DISTINCT order_id) /
-                  NULLIF((SELECT COUNT(*) FROM {SCHEMA}.shopify_orders WHERE is_synthetic=true),0)
+                  NULLIF((SELECT COUNT(*) FROM {SCHEMA}.shopify_orders),0)
               ,1)
               FROM {SCHEMA}.synthetic_touchpoint_journey""",
           lambda pct: pct is not None and 20.0 <= pct <= 60.0)
@@ -2493,9 +2600,8 @@ def validate_seed(cur) -> list[dict]:
     # Check 11: BNPL orders exist from Month 10 (March 2025) onward
     check('BNPL orders present from March 2025',
           f"""SELECT COUNT(*) FROM {SCHEMA}.shopify_orders
-              WHERE payment_gateway = 'afterpay'
-              AND created_at >= '2025-03-01'
-              AND is_synthetic = true""",
+              WHERE payment_gateway_names @> '["afterpay"]'::jsonb
+              AND created_at >= '2025-03-01'""",
           lambda n: n is not None and n > 100)
 
     passes = sum(1 for r in results if r['status'] == 'PASS')
@@ -2536,47 +2642,36 @@ def main() -> None:
     try:
         logger.info('Step 1/12 â€” seed_sku_master')
         seed_sku_master(cur)
-        conn.commit()
 
         logger.info('Step 2/12 â€” seed_customers')
         seed_customers(cur)
-        conn.commit()
 
         logger.info('Step 3/12 â€” seed_orders')
         orders_by_week = seed_orders(cur)
-        conn.commit()
 
         logger.info('Step 4/12 â€” seed_line_items')
         order_to_skus = seed_line_items(cur, orders_by_week)
-        conn.commit()
 
         logger.info('Step 5/12 â€” seed_refunds')
         seed_refunds(cur, orders_by_week, order_to_skus)
-        conn.commit()
 
         logger.info('Step 6/12 â€” seed_fulfillments')
         seed_fulfillments(cur, orders_by_week)
-        conn.commit()
 
         logger.info('Step 7/12 â€” seed_discount_codes')
         seed_discount_codes(cur)
-        conn.commit()
 
         logger.info('Step 8/12 â€” seed_touchpoint_journeys')
         seed_touchpoint_journeys(cur, orders_by_week)
-        conn.commit()
 
         logger.info('Step 9/12 â€” seed_brand_event_calendar')
         seed_brand_event_calendar(cur)
-        conn.commit()
 
         logger.info('Step 10/12 â€” seed_dq_scores')
         seed_dq_scores(cur)
-        conn.commit()
 
         logger.info('Step 11/12 â€” seed_alert_log')
         seed_alert_log(cur)
-        conn.commit()
 
         logger.info('Step 12/12 â€” seed_suppression_log')
         seed_suppression_log(cur)
@@ -2584,7 +2679,6 @@ def main() -> None:
 
         logger.info('Validation â€” 11 checks')
         results = validate_seed(cur)
-        conn.commit()
 
         logger.info('Writing manifest')
         write_manifest()

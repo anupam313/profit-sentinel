@@ -13,3 +13,6 @@ warehouse/logs/
 
 # Editor / tooling
 .claude/
+
+# Shopify Standard Product Taxonomy (cloned reference asset, ~80MB — not committed)
+data/shopify_taxonomy/
