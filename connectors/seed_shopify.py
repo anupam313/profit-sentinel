@@ -649,7 +649,6 @@ def seed_sku_master(cur) -> None:
     try:
         product_rows = []
         variant_rows = []
-        cost_rows    = []
 
         sku_number_by_cat: dict[str, int] = {c: 1 for c in SKU_CATEGORIES}
         for sku_code in LOCKED_SKUS:
@@ -715,17 +714,6 @@ def seed_sku_master(cur) -> None:
                         spec['weight_g'],
                     ))
 
-                    is_finaloop   = PY_RNG.random() < 0.75
-                    supplier_cost = price / 1.28 / PY_RNG.uniform(2.2, 3.0)
-                    landed_cost   = supplier_cost * 1.28
-                    cost_rows.append((
-                        CLIENT_ID, str(variant_id), sku_code, 'sku_cogs',
-                        round(supplier_cost, 2), round(landed_cost, 2),
-                        'finaloop_export' if is_finaloop else 'derived',
-                        None, None, None, None, None, None,
-                        launch_date, None, True,
-                    ))
-
                 MANIFEST['sku_list'].append({
                     'sku': sku_code, 'product_id': product_id,
                     'variant_ids': [v['variant_id'] for v in SKU_TO_VARIANTS.get(sku_code, [])],
@@ -744,41 +732,9 @@ def seed_sku_master(cur) -> None:
              'inventory_quantity', 'weight'],
             variant_rows)
         logger.info('seed_sku_master | shopify_product_variants: %d rows', n)
-
-        n = batch_insert(cur, 'sku_cost_master',
-            ['client_id', 'shopify_variant_id', 'sku', 'record_type',
-             'supplier_cost', 'landed_cost', 'landed_cost_source',
-             'influencer_id', 'package_landed_cost', 'packaging_cost',
-             'shipping_cost', 'total_package_cost', 'featured_item_sku',
-             'effective_from', 'effective_to', 'is_synthetic'], cost_rows)
-        logger.info('seed_sku_master | sku_cost_master: %d rows', n)
-
-        # Gifting packages for influencer activations
-        gift_rows = []
-        active_skus = [s for s in list(SKU_TO_VARIANTS.keys()) if s.split('-')[1] not in ('FORMAL', 'MENS')]
-        for act in INFLUENCER_CALENDAR:
-            if act['fee_structure'] in ('gifting', 'hybrid') and act['package_landed_cost'] > 0:
-                featured_sku = PY_RNG.choice(active_skus[:40])
-                shipping_c   = PY_RNG.randint(18, 45)
-                total_cost   = act['package_landed_cost'] + act['packaging_shipping_cost'] + shipping_c
-                gift_rows.append((
-                    CLIENT_ID, f'gift_{act["id"]}', featured_sku,
-                    'influencer_gifting_package',
-                    None, None, 'manual',
-                    act['id'],
-                    act['package_landed_cost'],
-                    act['packaging_shipping_cost'],
-                    shipping_c, total_cost, featured_sku,
-                    act['activation_date'], None, True,
-                ))
-
-        batch_insert(cur, 'sku_cost_master',
-            ['client_id', 'shopify_variant_id', 'sku', 'record_type',
-             'supplier_cost', 'landed_cost', 'landed_cost_source',
-             'influencer_id', 'package_landed_cost', 'packaging_cost',
-             'shipping_cost', 'total_package_cost', 'featured_item_sku',
-             'effective_from', 'effective_to', 'is_synthetic'], gift_rows)
-        logger.info('seed_sku_master | gifting packages: %d rows', len(gift_rows))
+        # sku_cost_master is now owned solely by seed_sku_cost_master.py (SKU-contract Pass One):
+        # it reads this catalog (shopify_product_variants) as its cost universe, so cost can no
+        # longer drift from the catalog. seed_shopify.py no longer writes sku_cost_master.
 
     except Exception as e:
         logger.error('SOURCE: Shopify Seed | CLIENT: %s | ERROR: %s | CONTEXT: seed_sku_master',
