@@ -1872,6 +1872,7 @@ FASHION_CAUSAL_GRAPH = {
 | H18 — Klaviyo open rate unreliable | `permanent_dq_limitations` | `informational` |
 | H19 — Permanent DQ limitation active | `permanent_dq_limitations` | `informational` |
 | H20 — New SKU COGS Gap | `sku_cost_master` JOIN `shopify_product_variants` | `founder_action_required` |
+| H21 — Taxonomy Version Drift | `category_inference.py`: stored/Shopify-assigned code unresolved in pinned `categories.json` | `data_integrity` |
 
 ---
 
@@ -3451,10 +3452,24 @@ ALTER TABLE public.client_config
 
 ---
 
-### ALTERED TABLE — public.sku_cost_master (Gap 3 additions)
+### ALTERED TABLE — client_azure_co.sku_cost_master (Gap 3 + taxonomy-versioning additions)
+
+> **DOC-VS-REALITY CORRECTION (2026-06-22, taxonomy-versioning build).** This block
+> previously read `ALTER TABLE public.sku_cost_master` and was described as landed
+> ("the resolved columns live in tech-arch's ALTERED TABLE block (done)"). Live
+> read-only discovery showed otherwise: `sku_cost_master` exists ONLY in schema
+> `client_azure_co` (there is NO `public.sku_cost_master`), and NONE of these
+> columns had been applied — the ALTER lived only in this doc, pointed at a
+> non-existent schema, and was never executed. The taxonomy-versioning build is
+> what actually creates them, via `connectors/category_inference.py:ensure_schema()`
+> (ADD COLUMN IF NOT EXISTS; applied 2026-06-22). Schema name corrected to
+> `client_azure_co` here. The `founder_category` / `ai_inferred_category` columns
+> remain specced but are NOT yet created — `ensure_schema()` adds the six columns
+> needed for resolution + provenance + grouping; the two display-label columns
+> follow when the display path is built.
 
 ```sql
-ALTER TABLE public.sku_cost_master
+ALTER TABLE client_azure_co.sku_cost_master
 
     ADD COLUMN IF NOT EXISTS founder_category
         text,
@@ -3501,15 +3516,102 @@ ALTER TABLE public.sku_cost_master
     -- NULL when category_source = 'shopify_assigned' or 'manual'.
 
     ADD COLUMN IF NOT EXISTS category_source
-        text default 'shopify_assigned';
-    -- Tracks how the resolved node / founder_category was determined
+        text,
+    -- Tracks how the resolved node was determined. (No DB default — the resolver
+    --   always writes the value explicitly; the prior `default 'shopify_assigned'`
+    --   would mislabel an unwritten row.)
     -- values:
-    --   shopify_assigned = resolved from the Shopify-assigned category (Step 0)
-    --   ai_inferred      = LLM classification snapped to a taxonomy node (Step 0 absent)
-    --   manual           = founder relabelled the DISPLAY label in onboarding UI (display only)
+    --   shopify_assigned  = resolved from the Shopify-assigned category (Step 0)
+    --   ai_inferred       = LLM classification snapped to a taxonomy node (Step 0 absent/unresolved)
+    --   manual            = founder relabelled the DISPLAY label in onboarding UI (display only)
+    --   brand_level_floor = could not place (no Step 0 + thin/absent text): held at the
+    --                       AL-19 brand-level-with-disclosure floor, NEVER silently dropped.
     -- product_type is NOT a source — retained as a weak AI-inference input and a
     --   low-agreement internal-grouping fallback only, never a display label, never a key.
+
+    ADD COLUMN IF NOT EXISTS taxonomy_version
+        text,
+    -- The PINNED taxonomy version under which THIS SKU's category was resolved
+    --   (provenance of OUR resolution, not Shopify's assignment date). Always set to
+    --   PINNED_TAXONOMY_VERSION (connectors/taxonomy_config.py). Lets a resolved node
+    --   be re-interpreted/re-mapped if a later release re-ids/merges/splits/retires it.
+
+    ADD COLUMN IF NOT EXISTS category_grouping_key
+        text;
+    -- The field category-level aggregations (marts / D1) will BIND to. Day-one value =
+    --   the resolved node id at the AL-19 firing depth, which currently EQUALS category_id
+    --   for every placed SKU (and = 'brand-level' for brand_level_floor SKUs). Decoupled
+    --   from category_id so firing depth can later diverge from grouping depth without a
+    --   schema change. Rebinding marts/D1 from category_id → category_grouping_key is the
+    --   NEXT build item (gated on verifying this key is populated and equals current grouping).
 ```
+
+---
+
+### TAXONOMY VERSIONING FOUNDATION (2026-06-22)
+
+Shopify's Standard Product Taxonomy is versioned and updated upstream. A resolved
+or seed-baked category gid only means something "as of release X", so category data
+carries a VERSION dimension. This foundation pins the version, makes resolution
+reproducible, and DETECTS drift.
+
+**Pinned-list artifact.** `connectors/data/taxonomy/<version>/categories.json` is the
+committed pinned list resolution binds to. For 2026-05 it is a SLIM all-vertical
+projection — every node in every vertical (14,606 nodes) with the resolution fields
+only (`id`, `full_name`, `parent_id`, `level`), ~3.4 MB. It is NOT the deferred
+apparel projection (all verticals, fewer fields). The full ~80 MB upstream
+`dist/en/categories.json` (attributes + return_reasons) stays the gitignored
+reference asset (`data/shopify_taxonomy/`, .gitignore L17–18) — committing 80 MB to
+history was rejected in favour of this slim file.
+
+**Version constant (one home, no mirror).** `PINNED_TAXONOMY_VERSION = "2026-05"`
+lives ONLY in `connectors/taxonomy_config.py`. `seed_shopify.py` (records it in the
+seed manifest; its 13 baked apparel gids are validated against it) and
+`category_inference.py` (resolves + stamps against it) READ the constant — the
+literal is never duplicated.
+
+**Resolution order** (`category_inference.py`, per SKU; full spec in the NEW SCRIPT
+section below): (1) Step-0 Shopify-assigned category that resolves in the pinned list
+→ `shopify_assigned`; (2) Step-0 present but does NOT resolve → raise the H21 drift
+signal, then LLM-snap → `ai_inferred`; (3) no Step 0 but product text → LLM-snap →
+`ai_inferred`; (4) no Step 0 + thin/absent text → **brand-level-with-disclosure
+floor** (`brand_level_floor`). Every SKU is stamped `taxonomy_version` =
+PINNED_TAXONOMY_VERSION and `category_grouping_key` = resolved node id at AL-19 depth
+(= `category_id` for placed SKUs; = `brand-level` for the floor).
+
+**KEEP-AT-BRAND-LEVEL LOCK.** A SKU that cannot be placed (case 4 — e.g. a deleted
+SKU known only by an order-line name) is HELD at the brand-level floor WITH
+disclosure and NEVER silently dropped. Rationale: reconciliation with the founder's
+own Shopify totals + unbiased baselines. Its `category_grouping_key` is the constant
+`brand-level` (never NULL) so it stays inside category-level aggregation.
+
+**DRIFT SIGNAL — H21 (New, data-integrity).** A stored/Shopify-assigned category code
+that does NOT resolve in the pinned list raises H21, naming the exact SKUs (in
+`alert_log.evidence_stack_json`). H21 = next available H-code (H1–H20 in use; H20 =
+New SKU COGS Gap). Emitted by `category_inference.py:raise_drift_signal()` to
+`public.alert_log` (deduped on client_id+alert_type+signal_date, like Agent A). This
+is the "detect" half of detect-and-bounded-cost: the cost of a deliberate upstream
+change is bounded because it is detected and named, not silently mis-grouped.
+
+**DEFERRED (do NOT build this pass):**
+- **Version→version remap algorithm** — consumes a detected H21 drift to migrate
+  resolved nodes across releases. Justified by **detect-and-bounded-cost** (the H21
+  signal), NOT by change frequency.
+  - *Remap robustness (required when built):* the remap MUST check whether a
+    shopify→shopify crosswalk shipped for the specific pin jump (`dist/en/integrations/
+    shopify/shopify_<old>_to_shopify_<new>.json`); if none exists (e.g. 2026-02→2026-05
+    shipped no direct map — nearest source is 2025-12), fall back to an id/breadcrumb
+    diff of the two pinned `categories.json` files rather than assuming no deliberate
+    change occurred.
+  - *Measured base rate (Apparel & Accessories, 2025-09..2026-05):* deliberate changes
+    ≈ 0 per release; the only observed event was one rename/reparent cascade
+    (Baby & Toddler → Baby & Children's, 2025-12→2026-02); zero merge/split/retire
+    across the window. Releases are otherwise pure additions, which do NOT renumber
+    existing nodes (ids are stable-assigned, not positional).
+- **PS-owned surrogate-key dimension table** — a stable internal key decoupled from
+  the Shopify gid.
+- **Apparel projection** — a trimmed apparel-only pinned subset (distinct from the
+  slim all-vertical artifact committed above).
 
 ---
 

@@ -40,6 +40,9 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.dirname(__file__))
+from taxonomy_config import PINNED_TAXONOMY_VERSION  # noqa: E402  (single home for the version pin)
+
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 logging.basicConfig(
@@ -134,10 +137,13 @@ COLORS_BY_CAT = {
 
 # ─── Standard Product Taxonomy (synthetic seed) ───────────────────────────────
 # Real gids + breadcrumbs from Shopify's Standard Product Taxonomy, Apparel &
-# Accessories vertical (sourced from data/shopify_taxonomy/categories.json).
+# Accessories vertical, pinned to PINNED_TAXONOMY_VERSION (read from
+# taxonomy_config — the single home for the version literal; recorded in MANIFEST).
+# All 13 gids below were verified to resolve in that pinned release.
 # Baked here as constants so the seed has NO runtime dependency on the ~80 MB
 # taxonomy file (that file is a gitignored reference asset, also used by the
-# GraphQL real-data path).
+# GraphQL real-data path). The committed slim pinned list lives at
+# connectors/data/taxonomy/<version>/categories.json (resolution fields only).
 #
 # Coverage is DELIBERATELY not production's ~12%: ~40% of synthetic rows get a
 # genuine apparel node (matched to product_type where sensible), ~60% stay
@@ -613,6 +619,7 @@ MANIFEST: dict[str, Any] = {
     'brand': BRAND_NAME,
     'client_id': CLIENT_ID,
     'schema': SCHEMA,
+    'taxonomy_version': PINNED_TAXONOMY_VERSION,  # pin the baked gids were validated against
     'seed_period': {'start': str(SEED_START), 'end': str(SEED_END)},
     'orders_by_week': {},        # iso_week → list of order_ids
     'sku_list': [],              # [{sku, product_id, variant_ids, price, category, launch_date}]
