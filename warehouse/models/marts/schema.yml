@@ -36,6 +36,26 @@ models:
         tests: [not_null]
       - name: return_rate_pct
 
+  - name: mart_customer_segments_daily
+    description: "Daily customer segmentation by cumulative order count. Explorer/Regular/Loyalist/Advocate. One row per date × segment."
+    columns:
+      - name: date
+        tests: [not_null]
+      - name: client_id
+        tests: [not_null]
+      - name: segment
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['explorer', 'regular', 'loyalist', 'advocate']
+      - name: segment_key
+        tests: [unique, not_null]
+      - name: segment_customer_count
+        tests: [not_null]
+      - name: segment_pct_of_total_customers
+        tests: [not_null]
+
   - name: mart_causal_chain_daily
     description: "Primary Agent A scan table. All signals + prior-year baseline + YoY indices."
     columns:
@@ -45,3 +65,11 @@ models:
         tests: [not_null]
       - name: total_ad_spend
         tests: [not_null]
+      - name: campaign_sku_return_rate_7d
+        description: >
+          Fraction of 7-day trailing returns whose product_id matches a SKU
+          actively promoted via Meta or TikTok content_ids on that date.
+          NULL when no content_ids are present in the trailing 7-day window
+          (i.e., no Meta/TikTok campaigns reported content_ids for those days).
+          Range: 0.0–1.0. Agent A uses this to flag when BFCM-era return spikes
+          correlate with advertised products (three-source causal chain A1).

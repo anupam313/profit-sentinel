@@ -49,9 +49,9 @@ gorgias as (
 ga4 as (
     select
         date,
-        sum(sessions)                       as total_sessions,
-        avg(overall_cvr)                    as avg_cvr,
-        avg(bounce_rate)                    as avg_bounce_rate
+        sum(sessions)                                              as total_sessions,
+        sum(purchase_completed)::numeric / nullif(sum(sessions), 0) as avg_cvr,
+        avg(bounce_rate)                                           as avg_bounce_rate
     from {{ ref('stg_ga4_sessions') }}
     group by date
 ),
@@ -143,6 +143,61 @@ repeat_purchase as (
     from date_spine ds
     cross join customer_cohorts cc
     group by ds.date
+),
+
+-- ── Step 4: Attribution Overlap (Session 3, 2026-05-19) ──────────────────────
+-- Three channels each claim attributed revenue. Sum > 1.0 of Shopify net revenue
+-- IS the double-attribution signal — expected and correct. Max > 1.5 during BFCM
+-- is plausible. Required by historical_pattern_scan.py.
+-- Meta: no attributed_revenue column in stg_meta_ad_performance — computed as
+--   spend * purchase_roas (spend-weighted ROAS proxy). Rows where purchase_roas
+--   is NULL excluded (impressions-only rows with no conversion signal).
+-- TikTok: attributed_revenue column exists (aliased from revenue in staging).
+-- Klaviyo: sum of revenue_attributed from stg_klaviyo_email_events per date.
+-- Denominator: net_revenue from mart_net_revenue_daily (via revenue CTE).
+-- All three ratios share the same rolling denominator window.
+attribution_overlap as (
+    select
+        d.date,
+        sum(coalesce(meta_attr.meta_attributed_revenue, 0)) over (
+            order by d.date rows between 6 preceding and current row
+        ) / nullif(
+            sum(coalesce(rev.net_revenue, 0)) over (
+                order by d.date rows between 6 preceding and current row
+            ), 0
+        )                                                                       as meta_attributed_pct_of_shopify_revenue,
+        sum(coalesce(tik_attr.tiktok_attributed_revenue, 0)) over (
+            order by d.date rows between 6 preceding and current row
+        ) / nullif(
+            sum(coalesce(rev.net_revenue, 0)) over (
+                order by d.date rows between 6 preceding and current row
+            ), 0
+        )                                                                       as tiktok_attributed_pct_of_shopify_revenue,
+        sum(coalesce(klav_attr.klaviyo_attributed_revenue, 0)) over (
+            order by d.date rows between 6 preceding and current row
+        ) / nullif(
+            sum(coalesce(rev.net_revenue, 0)) over (
+                order by d.date rows between 6 preceding and current row
+            ), 0
+        )                                                                       as klaviyo_attributed_pct_of_shopify_revenue
+    from date_spine d
+    left join (
+        select date, sum(spend * purchase_roas) as meta_attributed_revenue
+        from {{ ref('stg_meta_ad_performance') }}
+        where purchase_roas is not null
+        group by 1
+    ) meta_attr using (date)
+    left join (
+        select date, sum(attributed_revenue) as tiktok_attributed_revenue
+        from {{ ref('stg_tiktok_ad_performance') }}
+        group by 1
+    ) tik_attr using (date)
+    left join (
+        select event_date as date, sum(revenue_attributed) as klaviyo_attributed_revenue
+        from {{ ref('stg_klaviyo_email_events') }}
+        group by 1
+    ) klav_attr using (date)
+    left join revenue rev using (date)
 )
 
 select
@@ -236,18 +291,26 @@ select
         cc.last_gorgias_sync,
         cc.last_ga4_sync,
         cc.last_sentry_sync
-    )                                                                   as data_as_of
+    )                                                                   as data_as_of,
+
+    -- ── Step 4: Attribution Overlap Columns (Session 3, 2026-05-19) ──────────
+    -- Sum of all three > 1.0 is expected — that IS the double-attribution signal.
+    -- Max > 1.5 during BFCM is plausible and not a data error.
+    ao.meta_attributed_pct_of_shopify_revenue,
+    ao.tiktok_attributed_pct_of_shopify_revenue,
+    ao.klaviyo_attributed_pct_of_shopify_revenue
 
 from date_spine ds
 cross join config cc
-left join revenue        r   on ds.date = r.date
-left join meta           m   on ds.date = m.date
-left join tiktok         t   on ds.date = t.date
-left join klaviyo        k   on ds.date = k.date
-left join gorgias        g   on ds.date = g.date
-left join ga4            ga  on ds.date = ga.date
-left join ga4_errors     ge  on ds.date = ge.date
-left join sentry         se  on ds.date = se.date
-left join returns        ret on ds.date = ret.date
-left join repeat_purchase rp on ds.date = rp.date
+left join revenue          r   on ds.date = r.date
+left join meta             m   on ds.date = m.date
+left join tiktok           t   on ds.date = t.date
+left join klaviyo          k   on ds.date = k.date
+left join gorgias          g   on ds.date = g.date
+left join ga4              ga  on ds.date = ga.date
+left join ga4_errors       ge  on ds.date = ge.date
+left join sentry           se  on ds.date = se.date
+left join returns          ret on ds.date = ret.date
+left join repeat_purchase  rp  on ds.date = rp.date
+left join attribution_overlap ao on ds.date = ao.date
 order by ds.date desc
