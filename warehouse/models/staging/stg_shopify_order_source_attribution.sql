@@ -1,5 +1,10 @@
 with orders as (
-    select * from {{ source('client_azure_co', 'shopify_orders') }}
+    select
+        *,
+        -- is_synthetic DERIVED from the shopify_orders seed predicate (id < 1e12).
+        -- This model reads shopify_orders, so it uses the orders predicate.
+        (id < 1000000000000) as is_synthetic
+    from {{ source('client_azure_co', 'shopify_orders') }}
 )
 
 select
@@ -34,6 +39,14 @@ select
     case
         when source_name in ('web', 'pos', 'draft_orders') then true
         else false
-    end as has_dedicated_connector
+    end as has_dedicated_connector,
+
+    is_synthetic
 
 from orders
+-- RULE 3 (per-client form): synthetic rows visible only when toggle is on
+where (
+    is_synthetic = false
+    or (select use_synthetic_data from public.client_config
+        where client_id = '{{ var("client_id") }}') = true
+)

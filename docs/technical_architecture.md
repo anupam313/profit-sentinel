@@ -704,13 +704,24 @@ spec in product_strategy.md Section 5.
 
 Tables created automatically by Airbyte. Schema name: `client_{brand_name}`.
 
-All source tables have one additional column added after Airbyte creates them:
+Synthetic-vs-real provenance is **not** a universal stored column. Per DEBT-006 the
+raw `shopify_*` tables carry **no** `is_synthetic` column (86 of 169 `client_azure_co`
+tables have one; the Shopify spine does not). For Airbyte-managed Shopify sources,
+`is_synthetic` is **DERIVED in the staging layer** from the seed isolation predicates —
+the same predicates `seed_shopify.py` uses to isolate its own rows:
 ```sql
-ALTER TABLE client_azure_co.shopify_orders
-ADD COLUMN is_synthetic boolean default false;
+-- in stg_shopify_orders (and order_line_items / refunds / order_source_attribution /
+-- inventory_levels) — derived, not stored:
+(id < 1000000000000)                              as is_synthetic   -- orders/refunds
+(order_id < 1000000000000)                        as is_synthetic   -- line items
+(not (inventory_item_id::text ~ '^[0-9]{13,}$'))  as is_synthetic   -- inventory levels
 ```
-
-`is_synthetic = true` for seed script data. `is_synthetic = false` (or null) for real Airbyte data. Toggle via `use_synthetic_data` in `client_config`.
+Staging then filters with the per-client RULE 3 form (see CLAUDE.md RULE 3). PS
+application tables (`alert_log`, `brand_event_calendar`, `suppression_log`) keep a
+seed-set **stored** `is_synthetic` column. Toggle for all of them is
+`use_synthetic_data` in `public.client_config` (per-client, the source of truth). The
+connector-staging var-form divergence (meta/ga4/sentry) is noted in RULE 3 as pending
+reconciliation.
 
 **Shopify tables (created by Airbyte — ~50 tables):**
 ```
@@ -967,15 +978,22 @@ Example: `total_price` changes from `text` to `numeric` in new Shopify API versi
 ### Purpose
 Generate 24 months of realistic interconnected data across all 6 sources to test agents before any real client data exists.
 
-### is_synthetic Column
-Added to every raw source table after Airbyte creates it:
-```sql
-ALTER TABLE client_azure_co.shopify_orders
-ADD COLUMN is_synthetic boolean default false;
-```
+### is_synthetic — derived for Airbyte sources (DEBT-006)
+Raw `shopify_*` tables have **no** stored `is_synthetic` column. It is **derived in
+staging** from the seed isolation predicates and then RULE-3 filtered (per-client).
+Manually-managed sources that do carry the column (`meta_ad_performance`,
+`google_ads_performance`, `sku_cost_master`, `ga4_*`, `sentry_*`) keep filtering on
+the stored column; PS application tables keep a seed-set stored column. 86 of 169
+`client_azure_co` tables have the column; the Shopify spine derives it. The derive
+expression is fail-closed: if a predicate column is renamed or retyped on a future
+sync, the staging build errors loudly rather than silently mislabeling rows.
 
 ### use_synthetic_data Toggle
-In `client_config`. When `true`, dbt models include synthetic rows. When `false`, filters them out. Flip once real connectors go live — zero code changes.
+In `public.client_config` (per-client; PK on `client_id`). When `true`, staging exposes
+synthetic rows; when `false`, only real rows survive. The Shopify staging spine reads
+this **table** value directly (RULE 3 per-client form). NOTE: connector-staging models
+(meta/ga4/sentry) still read the dbt **var** `use_synthetic_data` form — divergence
+pending reconciliation. Flip once real connectors go live — zero code changes.
 
 ### Shared Event Calendar
 One Python dictionary defines all events. Every source generator reads from the same calendar so timestamps correlate correctly across sources.

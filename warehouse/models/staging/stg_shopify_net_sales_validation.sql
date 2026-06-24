@@ -26,7 +26,11 @@ select
     sum(case when o.source_channel = 'pos'
         then o.gross_revenue else 0 end)    as pos_revenue,
     sum(case when o.tags ilike '%wholesale%'
-        then o.gross_revenue else 0 end)    as b2b_revenue
+        then o.gross_revenue else 0 end)    as b2b_revenue,
+    -- is_synthetic passed THROUGH from stg_shopify_orders (already RULE-3 filtered
+    -- upstream — not re-derived, not re-filtered here). Date-grain aggregate, so
+    -- bool_and = true only when every order on that date is synthetic.
+    bool_and(o.is_synthetic)                as is_synthetic
 
 from orders o
 left join refund_amounts r on o.order_id::text = r.order_id::text

@@ -1,5 +1,11 @@
 with orders as (
-    select * from {{ source('client_azure_co', 'shopify_orders') }}
+    select
+        *,
+        -- is_synthetic DERIVED from the seed isolation predicate. Raw shopify_*
+        -- carries no is_synthetic column (DEBT-006); seed_shopify isolates its
+        -- rows with id < 1e12, so that predicate IS the synthetic flag.
+        (id < 1000000000000) as is_synthetic
+    from {{ source('client_azure_co', 'shopify_orders') }}
 )
 
 select
@@ -32,8 +38,17 @@ select
     tags,
     cancelled_at,
     cancelled_at is not null                        as is_cancelled,
-    email
+    email,
+    discount_codes,                                 -- pass-through for mart_causal re-route (Phase C)
+    is_synthetic
 
 from orders
 where cancelled_at is null
   and financial_status != 'voided'
+  -- RULE 3 (per-client form): synthetic rows are exposed only when THIS client's
+  -- toggle is on. Never the connector-staging `= var('use_synthetic_data')` form.
+  and (
+      is_synthetic = false
+      or (select use_synthetic_data from public.client_config
+          where client_id = '{{ var("client_id") }}') = true
+  )

@@ -329,8 +329,10 @@ google_spend_daily as (
 ),
 
 -- ── Discount order rate, 90-day trailing ─────────────────────────────────────
--- Uses raw shopify_orders.discount_codes (jsonb).
--- stg_shopify_orders does not expose discount_codes.
+-- Phase C: routed through filtered stg_shopify_orders, which now exposes
+-- discount_codes as a pass-through. This narrows the population vs the old raw
+-- read — staging excludes cancelled/voided orders AND synthetic rows (the latter
+-- only when client_config.use_synthetic_data is off).
 discount_daily as (
     select
         date(created_at)                                                         as date,
@@ -339,7 +341,7 @@ discount_daily as (
               and discount_codes::text != '[]'
         )::numeric                                                               as discounted_orders,
         count(*)                                                                 as total_orders
-    from {{ var('client_schema') }}.shopify_orders
+    from {{ ref('stg_shopify_orders') }}
     group by 1
 ),
 discount_rate_rolling as (
@@ -447,7 +449,7 @@ inventory_snapshot_base as (
         date(updated_at)                                                         as date,
         inventory_item_id,
         available
-    from {{ var('client_schema') }}.shopify_inventory_levels
+    from {{ ref('stg_shopify_inventory_levels') }}        -- Phase C: filtered staging
     where available is not null
 ),
 units_sold_daily as (
@@ -455,8 +457,9 @@ units_sold_daily as (
         date(o.created_at)                                                       as date,
         li.variant_id                                                            as inventory_item_id,
         sum(li.quantity)                                                         as units_sold
-    from {{ var('client_schema') }}.shopify_order_line_items li
-    inner join {{ var('client_schema') }}.shopify_orders o on o.id = li.order_id
+    from {{ ref('stg_shopify_order_line_items') }} li     -- Phase C: filtered staging
+    inner join {{ ref('stg_shopify_orders') }} o
+        on o.order_id::text = li.order_id                 -- stg order_id is bigint vs text → cast
     group by 1, 2
 ),
 units_sold_rolling as (

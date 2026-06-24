@@ -77,18 +77,45 @@ failure. Any query that could touch multiple client
 schemas must be challenged and redesigned before running.
 
 ## RULE 3 — SYNTHETIC DATA TOGGLE
-Every source table has an `is_synthetic boolean` column. 
-Every query and dbt model that reads from source tables 
-must respect the toggle in client_config:
+NOT every source table has a stored `is_synthetic` column 
+(86 of 169 client_azure_co tables do; the raw `shopify_*` 
+spine does NOT — DEBT-006). Provenance comes from two places:
+
+- Airbyte-managed Shopify sources: `is_synthetic` is DERIVED 
+  in staging from the seed isolation predicates — the same 
+  predicates `seed_shopify.py` uses to isolate its own rows: 
+  orders / refunds `id < 1e12`; line items `order_id < 1e12`; 
+  inventory_levels `NOT (inventory_item_id::text ~ '^[0-9]{13,}$')`; 
+  variants `sku ~ '^AZ-[A-Z]+-[0-9]+'`; products 
+  `product_type = ANY(seed categories)`; discounts 
+  `code = ANY(seed codes)`.
+- Stored column: manually-managed sources that have it 
+  (meta_ad_performance, google_ads_performance, sku_cost_master, 
+  ga4_*, sentry_*) and PS application tables (alert_log, 
+  brand_event_calendar, suppression_log — seed-set).
+
+Every staging model and query that reads source tables must 
+respect the toggle using the PER-CLIENT form — filter on the 
+`client_config` TABLE value, never the dbt var:
 
 ```sql
--- In dbt models, always filter based on config
+-- canonical per-client filter, applied at the staging boundary
 WHERE (
-  o.is_synthetic = false 
+  is_synthetic = false 
   OR (SELECT use_synthetic_data FROM public.client_config 
       WHERE client_id = '{{ var("client_id") }}') = true
 )
 ```
+
+`use_synthetic_data` lives in `public.client_config` (per-client, 
+PK on `client_id`) — the source of truth. Do NOT use the 
+connector-staging form `is_synthetic = {{ var('use_synthetic_data', 
+true) }}`: it keys off the dbt var, not the client, and can 
+expose real data on a wrong toggle. That divergence (meta/ga4/ 
+sentry staging still use the var-form) is PENDING reconciliation.
+
+Marts must NOT read raw source tables directly — they read 
+filtered staging, so synthetic rows never reach a client.
 
 Never write code that mixes synthetic and real data 
 without this guard.
