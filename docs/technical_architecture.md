@@ -1,5 +1,5 @@
 # Profit Sentinel — Technical Architecture
-*Version: Post-critique redesign | Last updated: 2026-06-14 (§11 File Locations — git-backed docs/ design-docs folder added, commit 7402434) | 2026-06-08 (D1 Gap 6 residual pass — BAU baseline now excludes pre-sale ramp windows + onboarding two-pass backfill; structural-break magnitude made brand-relative; D1 estimated fulfilment driver retired [D4 stays Phase-2]; fulfilment is feed-only in CM; see agent_d_build_spec.md + cross_alert_orchestration.md) | prior: 2026-06-04 (discount-depth/S19 PARTIAL: discount/returns/Gorgias-parser build items appended at end; margin_floor_pct flagged orphaned)*
+*Version: Post-critique redesign | Last updated: 2026-06-24 (§10 Build Sequence — Phase D/R11 data-integrity controls now in-path: dbt staging tests via dbt build + pre-commit seed gate in validate_seed) | 2026-06-14 (§11 File Locations — git-backed docs/ design-docs folder added, commit 7402434) | 2026-06-08 (D1 Gap 6 residual pass — BAU baseline now excludes pre-sale ramp windows + onboarding two-pass backfill; structural-break magnitude made brand-relative; D1 estimated fulfilment driver retired [D4 stays Phase-2]; fulfilment is feed-only in CM; see agent_d_build_spec.md + cross_alert_orchestration.md) | prior: 2026-06-04 (discount-depth/S19 PARTIAL: discount/returns/Gorgias-parser build items appended at end; margin_floor_pct flagged orphaned)*
 
 <!-- 2026-06-02 spec-update pass (D1 Gap 6 WIP): rename strike + AI-clustering/
 display-gate notes; category_inference_confidence redefined as cross-signal
@@ -1267,6 +1267,30 @@ Step 10 (Slack personal workspace):
   - Test Evidence Stack alert format
   - Test Approve/Snooze/Dismiss buttons
 ```
+
+### Phase D (R11) — data-integrity controls (IN-PATH as of 2026-06-24)
+
+The R9 double-seed incident showed nothing prevented duplicate / under-populated
+seed state. Phase D makes the controls real, in two independent layers:
+
+- **dbt staging tests, run via `dbt build`** (run + test in one — the canonical
+  post-seed dbt command). `unique` / `not_null` now cover all staging key
+  columns, including the 5 formerly-untested models (stg_klaviyo_flows,
+  stg_klaviyo_profiles, stg_shopify_inventory_items, stg_shopify_inventory_levels,
+  stg_synthetic_touchpoint_journey). Composite keys are covered by native singular
+  tests in `warehouse/tests/` (dbt_utils absent; RULE 4 — no surrogate cast).
+  `dbt build` materialises each model before testing it.
+- **Pre-commit seed gate** in `seed_shopify.py::validate_seed()` — runs BEFORE
+  `conn.commit()`; commit is conditional. Per-key uniqueness (COUNT==DISTINCT) and
+  presence-bands on seed-OWNED tables are CRITICAL (any failure rolls back the
+  whole seed); cross-source / not-seed-owned checks are ADVISORY (log only), so the
+  gate is order-independent. Resilience: per-check SAVEPOINT + retry-once under a
+  120s statement_timeout (RULE 6).
+
+No UNIQUE constraints are added to Airbyte-managed raw tables (DEBT-006; see 705,
+726, 1175); durable uniqueness is the two layers above. Remaining R11 hardening
+(Phase E: suppression_log canonicalisation; Phase F: validate_sync.py) stays
+scheduled.
 
 ---
 

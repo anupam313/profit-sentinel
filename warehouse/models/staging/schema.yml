@@ -114,3 +114,45 @@ models:
         tests: [not_null]
       - name: error_count
         tests: [not_null]
+
+  # ── Phase D (R11): the 5 previously-untested staging models ──────────────
+  # Single-key models: column-level unique + not_null. Composite-key models:
+  # not_null on each key column here; composite UNIQUENESS is enforced by native
+  # singular tests in warehouse/tests/ (dbt_utils absent; RULE 4 — no surrogate
+  # cast in the model SQL).
+  - name: stg_klaviyo_flows
+    description: "Klaviyo flows aggregated from email events (one row per flow_id)."
+    columns:
+      - name: flow_id
+        tests: [unique, not_null]
+
+  - name: stg_klaviyo_profiles
+    description: "Klaviyo profiles sourced from shopify_customers (one row per profile_id)."
+    columns:
+      - name: profile_id
+        tests: [unique, not_null]
+
+  # ISLAND-ONLY: source shopify_inventory_items is Airbyte-managed (no is_synthetic)
+  # and holds ~1 real Egnition row. Tests must pass on a single row and must NOT
+  # assume any synthetic rows exist.
+  - name: stg_shopify_inventory_items
+    description: "Shopify inventory items (Tier-2 COGS). Island-only (~1 real row)."
+    columns:
+      - name: inventory_item_id
+        tests: [unique, not_null]
+
+  - name: stg_shopify_inventory_levels
+    description: "Inventory levels per item/location. Composite key (see tests/assert_unique_*)."
+    columns:
+      - name: inventory_item_id
+        tests: [not_null]
+      - name: location_id
+        tests: [not_null]
+
+  - name: stg_synthetic_touchpoint_journey
+    description: "Multi-touch journeys. Composite key (see tests/assert_unique_*)."
+    columns:
+      - name: order_id
+        tests: [not_null]
+      - name: touchpoint_sequence
+        tests: [not_null]

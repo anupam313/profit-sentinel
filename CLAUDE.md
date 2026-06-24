@@ -212,4 +212,50 @@ Update the specific section, not a general changelog.
 The document must always reflect what is actually built, 
 not what was planned.
 
+## RUN PATH — SEED THEN DBT (canonical)
+The pipeline is run manually (no Makefile / 
+orchestrator — intentional pre-pilot).
+
+1. Seeds — each a standalone, idempotent script 
+   (key-scoped delete-then-insert). Run 
+   `python connectors/seed_shopify.py`, then the 
+   connector seeds (seed_meta, seed_klaviyo, 
+   seed_gorgias, seed_ga4, seed_tiktok, 
+   seed_loop_returns, seed_sentry, 
+   seed_sku_cost_master, seed_google_ads). 
+   Seed order is NOT fixed.
+
+2. dbt — from `warehouse/`, the canonical command 
+   is `dbt build` (run + test in one): 
+   `cd warehouse && dbt build`. `dbt build` 
+   materialises each model BEFORE testing it, so a 
+   uniqueness / not_null violation fails the run. 
+   Do NOT ship on `dbt run` alone — it skips tests. 
+   Scope with `dbt build --select staging` while 
+   iterating.
+
+Durable raw-data integrity is enforced at TWO 
+independent layers:
+- dbt staging tests: unique / not_null on every 
+  staging key column; composite keys via native 
+  singular tests in `warehouse/tests/`.
+- The seed-time gate in 
+  `seed_shopify.py::validate_seed()` — runs BEFORE 
+  `conn.commit()`; commit is conditional. It gates 
+  ONLY on integrity seed_shopify itself OWNS 
+  (Shopify spine + touchpoint + pii + 
+  discount_codes presence-bands and per-key 
+  uniqueness; BEC dup-excess). Cross-source / 
+  not-seed-owned checks are ADVISORY (logged, never 
+  roll back), so the gate is ORDER-INDEPENDENT — a 
+  missing connector never rolls back good Shopify 
+  data. The gate emits its rollback record in the 
+  RULE 5 log format, but it is a data-integrity 
+  control, not part of the RULE 5 error-handling 
+  standard.
+
+No UNIQUE constraints are added to Airbyte-managed 
+raw tables (DEBT-006); the two layers above are the 
+durable controls.
+
 ## FILE LOCATIONS (AUTHORITATIVE)

@@ -2518,29 +2518,92 @@ def seed_suppression_log(cur) -> None:
 # 13. validate_seed  (11-check validation block)
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+# --- Phase D (R11): seed-time integrity gate specs --------------------------
+# Presence-band centers = R9 healed single-copy counts (discovery section 4c).
+#   lower = ceil(0.7 * center) (min 1);  upper = floor(1.4 * center)
+# lower (~0.7x) fails loudly on empty/under-population; upper (~1.4x) is always
+# < 2x so any double-seed blows it. Integer math avoids float-floor drift.
+def _band(center):
+    return (max(1, -(-7 * center // 10)), 14 * center // 10)
+
+# Single-writer, seed_shopify-OWNED -> CRITICAL: tight band + per-key uniqueness.
+# (label, schema, table, key_cols, center)
+SEED_OWNED_TABLES = [
+    ('shopify_products',              SCHEMA, 'shopify_products',              ['id'],                               168),
+    ('shopify_product_variants',      SCHEMA, 'shopify_product_variants',     ['id'],                               626),
+    ('shopify_customers',             SCHEMA, 'shopify_customers',            ['id'],                              9509),
+    ('synthetic_customer_pii_lookup', SCHEMA, 'synthetic_customer_pii_lookup',['synthetic_customer_id'],           9508),
+    ('shopify_orders',                SCHEMA, 'shopify_orders',               ['id'],                             84230),
+    ('shopify_inventory_levels',      SCHEMA, 'shopify_inventory_levels',     ['inventory_item_id', 'location_id'], 626),
+    ('shopify_order_line_items',      SCHEMA, 'shopify_order_line_items',     ['id'],                            137006),
+    ('shopify_order_refunds',         SCHEMA, 'shopify_order_refunds',        ['id'],                             22979),
+    ('shopify_fulfillments',          SCHEMA, 'shopify_fulfillments',         ['id'],                              5250),
+    ('shopify_discount_codes',        SCHEMA, 'shopify_discount_codes',       ['id'],                                13),
+    ('synthetic_touchpoint_journey',  SCHEMA, 'synthetic_touchpoint_journey', ['order_id', 'touchpoint_sequence'], 63293),
+    ('suppression_log',               SCHEMA, 'suppression_log',              ['id'],                                10),
+]
+
+# Multi-writer (seed + connectors) -> CRITICAL uniqueness/dup-excess only; band
+# is ADVISORY presence (other writers inflate the count; seed contribution is
+# gated by content checks). (label, schema, table, key_cols_or_None, center)
+MULTI_WRITER_TABLES = [
+    ('brand_event_calendar', SCHEMA,   'brand_event_calendar', None,   116),  # dup-excess invariant
+    ('dq_metric_scores',     SCHEMA,   'dq_metric_scores',     ['id'],  42),
+    ('alert_log',            'public', 'alert_log',            ['id'], 177),
+]
+
+
 def validate_seed(cur) -> list[dict]:
     """
-    11 validation checks. Returns list of {check, status, detail}.
-    Logs PASS/FAIL for each. Raises if any critical check fails.
+    Validation gate (Phase D / R11). Returns [{check, status, actual, critical}].
+    Runs PRE-COMMIT in main(): any CRITICAL FAIL/ERROR rolls the whole seed back.
+    Existing range/content checks are kept; cross-source checks are advisory.
     """
     results = []
 
-    def check(name: str, sql: str, expected_fn, critical=True) -> bool:
-        try:
-            cur.execute(sql)
-            row = cur.fetchone()
-            actual = row[0] if row else None
-            ok = expected_fn(actual)
-            status = 'PASS' if ok else 'FAIL'
-            results.append({'check': name, 'status': status, 'actual': actual})
-            logger.info('VALIDATE | %-50s %s (got %s)', name, status, actual)
-            if not ok and critical:
-                logger.error('VALIDATE CRITICAL FAIL: %s â€” got %s', name, actual)
-            return ok
-        except Exception as e:
-            results.append({'check': name, 'status': 'ERROR', 'actual': str(e)})
-            logger.error('VALIDATE ERROR | %s: %s', name, e)
-            return False
+    # Phase D (RULE 6 timeout guard): bound each validation statement so a flaky
+    # link cannot hang the pre-commit gate. SET LOCAL is txn-scoped, set before
+    # any SAVEPOINT so a per-check rollback cannot discard it.
+    try:
+        cur.execute("SET LOCAL statement_timeout = '120s'")
+    except Exception as _e:
+        logger.warning('VALIDATE | could not set statement_timeout: %s', _e)
+
+    def check(name: str, sql: str, expected_fn, critical: bool = True) -> bool:
+        # Each check runs in a SAVEPOINT: an exception/timeout aborts only this
+        # statement, not the seed txn. Exceptions retry once; a False assertion
+        # is a FAIL (no retry). main() rolls back on any CRITICAL FAIL/ERROR.
+        last_err = None
+        for attempt in (1, 2):
+            try:
+                cur.execute('SAVEPOINT vchk')
+                cur.execute(sql)
+                row = cur.fetchone()
+                actual = row[0] if row else None
+                ok = expected_fn(actual)
+                cur.execute('RELEASE SAVEPOINT vchk')
+                status = 'PASS' if ok else 'FAIL'
+                results.append({'check': name, 'status': status,
+                                'actual': actual, 'critical': critical})
+                logger.info('VALIDATE | %-58s %s (got %s)%s',
+                            name, status, actual, '' if critical else ' [advisory]')
+                if not ok and critical:
+                    logger.error('VALIDATE CRITICAL FAIL: %s - got %s', name, actual)
+                return ok
+            except Exception as e:
+                last_err = e
+                try:
+                    cur.execute('ROLLBACK TO SAVEPOINT vchk')
+                    cur.execute('RELEASE SAVEPOINT vchk')
+                except Exception:
+                    pass
+                if attempt == 1:
+                    logger.warning('VALIDATE | %s errored (attempt 1/2), retrying: %s',
+                                   name, e)
+        results.append({'check': name, 'status': 'ERROR',
+                        'actual': str(last_err), 'critical': critical})
+        logger.error('VALIDATE ERROR | %s: %s', name, last_err)
+        return False
 
     # Check 1: Total order count in expected range (75,000-95,000)
     check('Order count in range 75K-95K',
@@ -2583,7 +2646,7 @@ def validate_seed(cur) -> list[dict]:
               ), 1)
               FROM {SCHEMA}.sku_cost_master
               WHERE record_type = 'sku_cogs' AND landed_cost_source = 'finaloop_export'""",
-          lambda pct: pct is not None and pct >= 70.0)
+          lambda pct: pct is not None and pct >= 70.0, critical=False)
 
     # Check 7: Touchpoint journeys exist for 25-55% of orders
     check('Touchpoint journeys 25-55% of orders',
@@ -2604,7 +2667,7 @@ def validate_seed(cur) -> list[dict]:
     check('dq_metric_scores covers all 7 sources',
           f"""SELECT COUNT(DISTINCT source) FROM {SCHEMA}.dq_metric_scores
               WHERE client_id = '{CLIENT_ID}'""",
-          lambda n: n is not None and n >= 7)
+          lambda n: n is not None and n >= 7, critical=False)
 
     # Check 10: suppression_log has entries for BFCM multi-suppression events
     check('suppression_log has BFCM multi-suppression events',
@@ -2619,6 +2682,40 @@ def validate_seed(cur) -> list[dict]:
               WHERE payment_gateway_names @> '["afterpay"]'::jsonb
               AND created_at >= '2025-03-01'""",
           lambda n: n is not None and n > 100)
+
+    # --- Phase D (R11): structural integrity (presence-band + uniqueness) -----
+    # Seed-owned single-writer tables -> CRITICAL tight band + per-key uniqueness.
+    for _label, _sch, _tbl, _keys, _center in SEED_OWNED_TABLES:
+        _lo, _hi = _band(_center)
+        check('%s: presence-band [%d,%d] (center %d)' % (_label, _lo, _hi, _center),
+              'SELECT COUNT(*) FROM %s.%s' % (_sch, _tbl),
+              (lambda n, lo=_lo, hi=_hi: n is not None and lo <= n <= hi),
+              critical=True)
+        _kx = _keys[0] if len(_keys) == 1 else '(' + ', '.join(_keys) + ')'
+        check('%s: uniqueness COUNT==DISTINCT(%s)' % (_label, _kx),
+              'SELECT COUNT(*) - COUNT(DISTINCT %s) FROM %s.%s' % (_kx, _sch, _tbl),
+              (lambda excess: excess == 0),
+              critical=True)
+
+    # Multi-writer -> CRITICAL uniqueness/dup-excess; band ADVISORY presence only.
+    for _label, _sch, _tbl, _keys, _center in MULTI_WRITER_TABLES:
+        check('%s: presence > 0 (multi-writer)' % _label,
+              'SELECT COUNT(*) FROM %s.%s' % (_sch, _tbl),
+              (lambda n: n is not None and n > 0),
+              critical=False)
+        if _keys is None:
+            # brand_event_calendar: id is IDENTITY; natural key has 2 native dups.
+            check('brand_event_calendar: dup-excess (client_id,event_name) <= 2',
+                  'SELECT COUNT(*) - COUNT(DISTINCT (client_id, event_name)) '
+                  'FROM %s.%s' % (_sch, _tbl),
+                  (lambda excess: excess is not None and excess <= 2),
+                  critical=True)
+        else:
+            _kx = _keys[0] if len(_keys) == 1 else '(' + ', '.join(_keys) + ')'
+            check('%s: uniqueness COUNT==DISTINCT(%s)' % (_label, _kx),
+                  'SELECT COUNT(*) - COUNT(DISTINCT %s) FROM %s.%s' % (_kx, _sch, _tbl),
+                  (lambda excess: excess == 0),
+                  critical=True)
 
     passes = sum(1 for r in results if r['status'] == 'PASS')
     logger.info('VALIDATE SUMMARY | %d/%d checks passed', passes, len(results))
@@ -2691,20 +2788,37 @@ def main() -> None:
 
         logger.info('Step 12/12 â€” seed_suppression_log')
         seed_suppression_log(cur)
-        conn.commit()
 
-        logger.info('Validation â€” 11 checks')
+        # --- Phase D (R11): integrity gate runs BEFORE commit -----------------
+        # Commit is conditional. Any CRITICAL failure rolls the ENTIRE seed back.
+        # Advisory checks (cross-source / not seed-owned) only log, never roll back.
+        logger.info('Validation - presence-band + uniqueness + range (PRE-COMMIT gate)')
         results = validate_seed(cur)
+        critical_failures = [r for r in results
+                             if r['status'] in ('FAIL', 'ERROR') and r.get('critical', True)]
+        advisory_failures = [r for r in results
+                             if r['status'] in ('FAIL', 'ERROR') and not r.get('critical', True)]
+        for r in advisory_failures:
+            logger.warning('VALIDATE advisory not met (no rollback): %s (got %s)',
+                           r['check'], r['actual'])
+
+        if critical_failures:
+            conn.rollback()
+            for r in critical_failures:
+                logger.error('SOURCE: Shopify Seed | CLIENT: %s | '
+                             'ERROR: critical validation failed: %s (got %s) | '
+                             'CONTEXT: pre-commit gate - ROLLED BACK, nothing committed',
+                             CLIENT_ID, r['check'], r['actual'])
+            sys.exit(1)
+
+        conn.commit()
+        passes = sum(1 for r in results if r['status'] == 'PASS')
+        logger.info('=== Seed complete. Integrity gate passed; committed. '
+                    '%d/%d checks passed (%d advisory not met) ===',
+                    passes, len(results), len(advisory_failures))
 
         logger.info('Writing manifest')
         write_manifest()
-
-        passes = sum(1 for r in results if r['status'] == 'PASS')
-        logger.info('=== Seed complete. %d/11 validation checks passed ===', passes)
-
-        if passes < 9:
-            logger.error('Fewer than 9/11 checks passed â€” review seed output before proceeding.')
-            sys.exit(1)
 
     except Exception as e:
         conn.rollback()
