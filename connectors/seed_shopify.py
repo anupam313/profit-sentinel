@@ -720,12 +720,19 @@ def seed_sku_master(cur) -> None:
                     'price': price, 'category': cat, 'launch_date': str(launch_date),
                 })
 
+        # R9 idempotency: clear seed product rows (real dev-store products excluded by product_type)
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.shopify_products WHERE product_type = ANY(%s)",
+            ([c.lower() for c in SKU_CATEGORIES],))
         n = batch_insert(cur, 'shopify_products',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'title', 'product_type', 'status', 'created_at', 'tags',
              'category_id', 'category_full_name'], product_rows)
         logger.info('seed_sku_master | shopify_products: %d rows', n)
 
+        # R9 idempotency: clear seed variant rows (real AD-04 variant excluded by AZ- pattern)
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.shopify_product_variants WHERE sku ~ '^AZ-[A-Z]+-[0-9]+'")
         n = batch_insert(cur, 'shopify_product_variants',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'product_id', 'sku', 'title', 'display_name', 'price',
@@ -816,11 +823,16 @@ def seed_customers(cur) -> None:
         CUST_ID_POOL.extend(repeat_ids * 3)
         PY_RNG.shuffle(CUST_ID_POOL)
 
+        # R9 idempotency: clear seed customers (real Egnition customer 8.8e12 excluded by id range)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_customers WHERE id < 1000000000000")
         n = batch_insert(cur, 'shopify_customers',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'created_at', 'orders_count', 'total_spent', 'email', 'tags'], customer_rows)
         logger.info('seed_customers | shopify_customers: %d rows', n)
 
+        # R9 idempotency: clear seed pii-lookup rows (synthetic_customer_id is TEXT; keyed on
+        # non-13-digit id — synthetic-only, not blind-truncated)
+        cur.execute(f"DELETE FROM {SCHEMA}.synthetic_customer_pii_lookup WHERE synthetic_customer_id !~ '^[0-9]{{13,}}$'")
         n = batch_insert(cur, 'synthetic_customer_pii_lookup',
             ['synthetic_customer_id', 'hashed_email', 'klaviyo_match_flag'], pii_rows)
         logger.info('seed_customers | synthetic_customer_pii_lookup: %d rows', n)
@@ -1070,6 +1082,8 @@ def seed_orders(cur) -> dict[str, list[int]]:
         for iso_week in sorted(orders_by_week)[:50]:
             MANIFEST['orders_by_week'][iso_week] = orders_by_week[iso_week][:20]  # first 20 per week
 
+        # R9 idempotency: clear seed orders (real Egnition order 6.4e12 excluded by id range)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_orders WHERE id < 1000000000000")
         n = batch_insert(cur, 'shopify_orders',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'created_at', 'order_number', 'total_line_items_price',
@@ -1092,6 +1106,8 @@ def seed_orders(cur) -> dict[str, list[int]]:
                     v['variant_id'], location_id, qty,
                     utc_dt(SEED_END),
                 ))
+        # R9 idempotency: clear seed inventory levels (real 14-digit inventory_item_id excluded)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_inventory_levels WHERE NOT (inventory_item_id::text ~ '^[0-9]{{13,}}$')")
         n = batch_insert(cur, 'shopify_inventory_levels',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'inventory_item_id', 'location_id', 'available', 'updated_at'], inv_rows_final)
@@ -1238,6 +1254,8 @@ def seed_line_items(cur, orders_by_week: dict[str, list[int]]) -> dict[int, list
 
                 order_to_skus[order_id] = skus_for_order
 
+        # R9 idempotency: clear seed line items (real order has no line items; seed order_id < 1e12)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_order_line_items WHERE order_id < 1000000000000")
         n = batch_insert(cur, 'shopify_order_line_items',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'order_id', 'product_id', 'variant_id', 'title', 'sku',
@@ -1334,6 +1352,8 @@ def seed_refunds(cur, orders_by_week: dict[str, list[int]],
                     reason,
                 ))
 
+        # R9 idempotency: clear seed refunds (seed id < 1e12; no real refunds present)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_order_refunds WHERE id < 1000000000000")
         n = batch_insert(cur, 'shopify_order_refunds',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'order_id', 'created_at', 'note'], refund_rows)
@@ -1377,6 +1397,8 @@ def seed_fulfillments(cur, orders_by_week: dict[str, list[int]]) -> None:
                     utc_dt(ful_date), tracking, carrier,
                 ))
 
+        # R9 idempotency: clear seed fulfillments (seed id < 1e12; no real fulfillments present)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_fulfillments WHERE id < 1000000000000")
         n = batch_insert(cur, 'shopify_fulfillments',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'order_id', 'status', 'created_at',
@@ -1411,16 +1433,19 @@ def seed_discount_codes(cur) -> None:
             ('SS25',      'percentage', 25, date(2026, 3, 1)),
         ]
         rows = []
-        for code, code_type, value, created_date in codes:
+        for seq, (code, code_type, value, created_date) in enumerate(codes):
             _ats = airbyte_ts(created_date)
             rows.append((
                 *airbyte_meta_cols(_ats),
-                PY_RNG.randint(100_000, 999_999),
+                920_000_000 + seq,   # R9: deterministic discount id (was PY_RNG.randint; nothing consumes it — S4)
                 code,
                 PY_RNG.randint(50, 500),  # usage_count
                 utc_dt(created_date),
             ))
 
+        # R9 idempotency: clear seed discount codes by code (real BXGY code excluded)
+        cur.execute(f"DELETE FROM {SCHEMA}.shopify_discount_codes WHERE code = ANY(%s)",
+                    ([c[0] for c in codes],))
         n = batch_insert(cur, 'shopify_discount_codes',
             ['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id',
              'id', 'code', 'usage_count', 'created_at'], rows)
@@ -1514,6 +1539,8 @@ def seed_touchpoint_journeys(cur, orders_by_week: dict[str, list[int]]) -> None:
                         tp_type, campaign_id, inf_ref,
                     ))
 
+        # R9 idempotency: clear seed touchpoints (synthetic-only; keyed on non-13-digit order_id)
+        cur.execute(f"DELETE FROM {SCHEMA}.synthetic_touchpoint_journey WHERE order_id !~ '^[0-9]{{13,}}$'")
         n = batch_insert(cur, 'synthetic_touchpoint_journey',
             ['order_id', 'touchpoint_sequence', 'channel', 'touchpoint_date',
              'touchpoint_type', 'campaign_id', 'influencer_id'], rows)
@@ -1925,6 +1952,11 @@ def seed_brand_event_calendar(cur) -> None:
             ))
         # â”€â”€ BFCM sunset spike (May both years) â€” already added above
 
+        # R9 idempotency: clear ONLY this run's seed BEC rows by emitted (client_id, event_name);
+        # connector-authored event_names (klaviyo/meta/tiktok/loop) are left untouched.
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.brand_event_calendar WHERE client_id = %s AND event_name = ANY(%s)",
+            (CLIENT_ID, [r[1] for r in rows]))
         n = batch_insert(cur, 'brand_event_calendar', cols, rows)
         logger.info('seed_brand_event_calendar | brand_event_calendar: %d rows', n)
 
@@ -2032,6 +2064,12 @@ def seed_dq_scores(cur) -> None:
         ]
         rows.extend(tiktok_disruption)
 
+        # R9 idempotency: clear ONLY this run's seed dq rows by emitted
+        # (client_id, source, metric_domain, effective_from); gorgias-authored rows are left untouched.
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.dq_metric_scores "
+            "WHERE (client_id, source, metric_domain, effective_from) IN %s",
+            (tuple((r[0], r[1], r[2], r[8]) for r in rows),))
         n = batch_insert(cur, 'dq_metric_scores', cols, rows)
         logger.info('seed_dq_scores | dq_metric_scores: %d rows', n)
 
@@ -2278,6 +2316,13 @@ def seed_alert_log(cur) -> None:
             layer1_headline='Alert C3 return rate (31%) may be understated. Loop Returns data 18h stale. True rate may be 31-36%. Full accuracy approximately 6 hours.',
         ))
 
+        # R9 idempotency: clear ONLY this run's seed alert rows by emitted
+        # (client_id, alert_type, fired_at). FK children alert_data_lineage / public.thread_context
+        # are empty (verified), so no cascade/violation; connector-written alerts are left untouched.
+        cur.execute(
+            "DELETE FROM public.alert_log "
+            "WHERE (client_id, alert_type, fired_at) IN %s",
+            (tuple((r[0], r[1], r[2]) for r in rows),))
         # Bulk insert (split due to size)
         n = 0
         for i in range(0, len(rows), 200):
@@ -2452,6 +2497,14 @@ def seed_suppression_log(cur) -> None:
                     sup_type='predictive',
                 ))
 
+        # R9 idempotency: clear ONLY this run's seed suppression rows by emitted
+        # (client_id, alert_type, signal_detected_at). NOTE: would_have_fired_at is NULL on seed rows,
+        # so signal_detected_at (row[1]) is the keyed field. This is client_azure_co ONLY — the
+        # connector-written public.suppression_log is untouched.
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.suppression_log "
+            "WHERE (client_id, alert_type, signal_detected_at) IN %s",
+            (tuple((r[0], r[2], r[1]) for r in rows),))
         n = batch_insert(cur, 'suppression_log', cols, rows)
         logger.info('seed_suppression_log | suppression_log: %d rows', n)
 
