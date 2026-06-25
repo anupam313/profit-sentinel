@@ -12,7 +12,7 @@ Tables created (in dependency order):
     5.  synthetic_touchpoint_journey
     6.  dq_metric_scores
     7.  dq_events
-    8.  suppression_log
+    8.  suppression_log — REMOVED in Phase E (public.suppression_log is canonical)
     9.  alert_data_lineage
     10. tiktok_organic_performance
     11. tag_normalisation
@@ -26,7 +26,6 @@ Tables created (in dependency order):
     17. public.alert_log — add 11 new columns (IF NOT EXISTS per column)
 
 Schema fixes applied vs. seed_decisions_gap_f_g.md DDL:
-  - suppression_log.signal_detected_at: NOT NULL removed (predictive entries have NULL)
   - alert_data_lineage FK: references public.alert_log(id) not alert_log(id)
   - ALTER TABLE targets public.alert_log not client_azure_co.alert_log
   - synthetic_customer_pii_lookup: user-specified schema
@@ -199,38 +198,9 @@ CREATE TABLE IF NOT EXISTS {SCHEMA}.dq_events (
 );
 """),
 
-    # ---- 8. suppression_log -------------------------------------------------
-    # FIX: signal_detected_at is nullable (no NOT NULL) to support predictive entries
-    (SCHEMA, 'suppression_log', f"""
-CREATE TABLE IF NOT EXISTS {SCHEMA}.suppression_log (
-    id                          bigint generated always as identity primary key,
-    client_id                   text not null,
-    signal_detected_at          timestamptz,
-    alert_type                  text not null,
-    signal_value                numeric,
-    threshold_value             numeric,
-    suppression_reason          text not null,
-    suppression_category        text not null,
-    suppression_state           integer,
-    suppression_type            text default 'reactive',
-    variance_explained_pct      numeric,
-    residual_signal             numeric,
-    suppression_source          text,
-    suppression_stack           jsonb,
-    would_have_fired_at         timestamptz,
-    detected_signal_description text,
-    threshold_context           text,
-    suppression_explanation     text,
-    residual_signal_description text,
-    founder_verification_action text,
-    original_alert_log_id       bigint,
-    retraction_reason           text,
-    provisional_revised_value   numeric,
-    full_accuracy_expected_at   timestamptz,
-    founder_queryable           boolean default true,
-    created_at                  timestamptz default now()
-);
-"""),
+    # ---- 8. suppression_log: REMOVED (Phase E) — public.suppression_log is the single
+    #         canonical table, populated by the connector seeds (tiktok S14 / sentry S24 /
+    #         loop_returns S17). The client_azure_co copy + this DDL were dropped in Step 3.
 
     # ---- 9. alert_data_lineage ----------------------------------------------
     # FIX: FK references public.alert_log(id) — alert_log lives in public schema
