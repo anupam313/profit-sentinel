@@ -2339,179 +2339,6 @@ def seed_alert_log(cur) -> None:
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 12. seed_suppression_log
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-def seed_suppression_log(cur) -> None:
-    """
-    Seeds suppression_log with the 12 multi-suppression events (MS1-MS12)
-    and key individual suppressions. ~200 total rows as sample.
-    Full volume (1800-2400 rows) generated per suppression count distribution.
-    """
-    try:
-        rows = []
-
-        def sup(alert_type, detected_at, signal_val, threshold_val,
-                reason, category, state, explained_pct, residual,
-                src_event, sup_stack, signal_desc, thresh_ctx, sup_expl,
-                residual_desc, verify_action, sup_type='reactive'):
-            return (
-                CLIENT_ID, detected_at, alert_type,
-                signal_val, threshold_val,
-                reason, category, state, sup_type,
-                explained_pct, residual,
-                src_event, json.dumps(sup_stack) if sup_stack else None,
-                None,  # would_have_fired_at
-                True,  # founder_queryable
-                signal_desc, thresh_ctx, sup_expl, residual_desc, verify_action,
-                None, None, None, None,  # retraction fields
-            )
-
-        cols = [
-            'client_id', 'signal_detected_at', 'alert_type',
-            'signal_value', 'threshold_value',
-            'suppression_reason', 'suppression_category', 'suppression_state',
-            'suppression_type',
-            'variance_explained_pct', 'residual_signal',
-            'suppression_source', 'suppression_stack',
-            'would_have_fired_at', 'founder_queryable',
-            'detected_signal_description', 'threshold_context',
-            'suppression_explanation', 'residual_signal_description',
-            'founder_verification_action',
-            'original_alert_log_id', 'retraction_reason',
-            'provisional_revised_value', 'full_accuracy_expected_at',
-        ]
-
-        # â”€â”€ MS1: Nov 27 2024 BFCM peak â€” S1+S9+S23+S34 simultaneously â”€â”€â”€â”€â”€â”€â”€
-        rows.append(sup(
-            'A3', utc_dt(date(2024, 11, 27), 10),
-            signal_val=48.0, threshold_val=22.0,
-            reason='BFCM sale period CPM spike explained by seasonal ad auction pressure',
-            category='S1', state=3,
-            explained_pct=92.0, residual=0.0,
-            src_event='BFCM Y1 Peak',
-            sup_stack={'primary': 'S1', 'secondary': ['S9','S23','S34'],
-                       'rule_applied': 'S42_R2_DQ_overrides', 'final_state': 3},
-            signal_desc='CPM 52% above weekly baseline during BFCM peak',
-            thresh_ctx='Threshold 22% CPM increase before alert fires',
-            sup_expl='BFCM sale period â€” CPM spikes of this magnitude are expected (S1 State 3 threshold: 40%)',
-            residual_desc=None,
-            verify_action='Compare CPM to same week prior year BFCM in Meta Ads Manager',
-        ))
-
-        # â”€â”€ MS2: Nov 28 2024 â€” S1+S44 (BFCM + defective unit component) â”€â”€â”€â”€â”€
-        rows.append(sup(
-            'D1_cpm_component', utc_dt(date(2024, 11, 28), 9),
-            signal_val=52.0, threshold_val=22.0,
-            reason='CPM component of D1 suppressed by BFCM S1',
-            category='S1', state=3,
-            explained_pct=100.0, residual=0.0,
-            src_event='BFCM Y1 Peak',
-            sup_stack={'primary': 'S1', 'secondary': ['S44'], 'rule': 'component_level',
-                       'note': 'Return rate component NOT suppressed â€” defective unit AZ-KNIT-031'},
-            signal_desc='CPM component of D1: 52% above baseline during BFCM',
-            thresh_ctx='S1 threshold 40% â€” exceeded. State 3 (full suppress) for CPM component only.',
-            sup_expl='BFCM CPM pressure suppressed (S1). Component-level suppression (S44): return_rate component remains active.',
-            residual_desc='Return rate component fires separately â€” AZ-KNIT-031 61% return rate unrelated to BFCM.',
-            verify_action='Check Gorgias product_quality tag volume for AZ-KNIT-031 specifically.',
-        ))
-
-        # â”€â”€ MS4: Oct 15 2024 â€” S2+S12 (FW Launch + iOS ATT) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        rows.append(sup(
-            'A3', utc_dt(date(2024, 10, 15), 9),
-            signal_val=28.0, threshold_val=15.0,
-            reason='Collection launch CPM spike + iOS ATT Q4 uncertainty combined',
-            category='S2', state=2,
-            explained_pct=75.0, residual=13.0,
-            src_event='FW 2024 Collection Launch',
-            sup_stack={'primary': 'S2', 'secondary': ['S12'],
-                       'rule': 'S42_R4_multiple_state2_use_conservative_residual'},
-            signal_desc='CPM 28% above baseline during FW launch week',
-            thresh_ctx='S2 threshold 30% for collection launch â€” not exceeded. Residual 13% unexplained.',
-            sup_expl='FW 2024 Collection Launch CPM pressure explains 75% of signal. iOS ATT Q4 recalibration adds uncertainty.',
-            residual_desc='13% of CPM spike unexplained by launch or iOS ATT â€” may warrant investigation if persists.',
-            verify_action='Check Meta campaign auction insights for same-period competitor spending.',
-        ))
-
-        # â”€â”€ MS6: Jan 13 2024 â€” S4+S3 (TikTok hard pause + post-holiday) â”€â”€â”€â”€â”€
-        rows.append(sup(
-            'C3', utc_dt(date(2024, 1, 13), 9),
-            signal_val=35.0, threshold_val=25.0,
-            reason='Post-holiday return period + TikTok platform disruption',
-            category='S4', state=3,
-            explained_pct=95.0, residual=0.0,
-            src_event='TikTok Hard Pause',
-            sup_stack={'primary': 'S4', 'secondary': ['S3'],
-                       'rule': 'S42_R1_highest_confidence_wins'},
-            signal_desc='Return rate 35% â€” above 25% threshold',
-            thresh_ctx='Post-holiday returns (Jan 1-21) explain up to 8pp above baseline',
-            sup_expl='TikTok disruption makes return attribution unreliable (S4). Post-holiday period (S3) also active.',
-            residual_desc=None,
-            verify_action='Wait until Jan 22 for S3 transition to State 2. Check if returns normalise after holiday cohort clears.',
-        ))
-
-        # â”€â”€ S36 Founder Manual Override scenarios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        override_examples = [
-            ('G1', date(2024, 11, 11), 'Already handling', 'S36', 3,
-             'Founder dismissed: Already handling. 14-day suppression applied. Outcome check scheduled.'),
-            ('A3', date(2025, 2, 15), 'Not actionable', 'S36', 3,
-             'Founder dismissed: Not actionable. Threshold sensitivity reduced 10%.'),
-        ]
-        for at, d_val, reason_txt, cat, state, desc in override_examples:
-            rows.append(sup(
-                at, utc_dt(d_val, 9),
-                signal_val=None, threshold_val=None,
-                reason=reason_txt, category=cat, state=state,
-                explained_pct=None, residual=None,
-                src_event=None,
-                sup_stack=None,
-                signal_desc=desc,
-                thresh_ctx='Founder manual override',
-                sup_expl=reason_txt,
-                residual_desc=None,
-                verify_action='System will check outcome at 14-day mark.',
-                sup_type='reactive',
-            ))
-
-        # â”€â”€ Predictive suppressions (S45) â€” 14 days before BFCM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        for pred_start, pred_name in [
-            (date(2024, 11, 6), 'BFCM Y1 predictive CPM pre-suppression'),
-            (date(2025, 11, 6), 'BFCM Y2 predictive CPM pre-suppression'),
-            (date(2024, 9, 24), 'FW 2024 launch predictive pre-suppression'),
-            (date(2025, 9, 23), 'FW 2025 launch predictive pre-suppression'),
-        ]:
-            if pred_start <= SEED_END:
-                rows.append(sup(
-                    'A3', utc_dt(pred_start, 8),
-                    signal_val=None, threshold_val=None,
-                    reason=pred_name,
-                    category='S45', state=3,
-                    explained_pct=100.0, residual=None,
-                    src_event=pred_name,
-                    sup_stack=None,
-                    signal_desc='Predictive suppression â€” no signal yet detected',
-                    thresh_ctx='Pre-suppression 14 days before peak period',
-                    sup_expl='CPM alerts pre-suppressed for upcoming peak. All other alerts active.',
-                    residual_desc=None,
-                    verify_action='Alerts resume after peak period ends automatically.',
-                    sup_type='predictive',
-                ))
-
-        # R9 idempotency: clear ONLY this run's seed suppression rows by emitted
-        # (client_id, alert_type, signal_detected_at). NOTE: would_have_fired_at is NULL on seed rows,
-        # so signal_detected_at (row[1]) is the keyed field. This is client_azure_co ONLY — the
-        # connector-written public.suppression_log is untouched.
-        cur.execute(
-            f"DELETE FROM {SCHEMA}.suppression_log "
-            "WHERE (client_id, alert_type, signal_detected_at) IN %s",
-            (tuple((r[0], r[2], r[1]) for r in rows),))
-        n = batch_insert(cur, 'suppression_log', cols, rows)
-        logger.info('seed_suppression_log | suppression_log: %d rows', n)
-
-    except Exception as e:
-        logger.error('SOURCE: Shopify Seed | CLIENT: %s | ERROR: %s | CONTEXT: seed_suppression_log',
-                     CLIENT_ID, str(e))
-        raise
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -2540,7 +2367,11 @@ SEED_OWNED_TABLES = [
     ('shopify_fulfillments',          SCHEMA, 'shopify_fulfillments',         ['id'],                              5250),
     ('shopify_discount_codes',        SCHEMA, 'shopify_discount_codes',       ['id'],                                13),
     ('synthetic_touchpoint_journey',  SCHEMA, 'synthetic_touchpoint_journey', ['order_id', 'touchpoint_sequence'], 63293),
-    ('suppression_log',               SCHEMA, 'suppression_log',              ['id'],                                10),
+    # Phase E: canonical = public.suppression_log (connector-seeded: tiktok S14=24 +
+    # sentry S24=3 + loop_returns S17=2 = 29). seed_shopify no longer writes it. Band is
+    # CRITICAL + non-vacuous: _band(29)=[21,40], so an empty/under-filled table FAILS.
+    # NOTE: Agent A will also write public later — revisit center if its volume lands here.
+    ('suppression_log',               'public', 'suppression_log',            ['id'],                                29),
 ]
 
 # Multi-writer (seed + connectors) -> CRITICAL uniqueness/dup-excess only; band
@@ -2669,12 +2500,14 @@ def validate_seed(cur) -> list[dict]:
               WHERE client_id = '{CLIENT_ID}'""",
           lambda n: n is not None and n >= 7, critical=False)
 
-    # Check 10: suppression_log has entries for BFCM multi-suppression events
-    check('suppression_log has BFCM multi-suppression events',
-          f"""SELECT COUNT(*) FROM {SCHEMA}.suppression_log
-              WHERE client_id = '{CLIENT_ID}'
-              AND suppression_stack IS NOT NULL""",
-          lambda n: n is not None and n >= 3)
+    # Check 10: suppression_log present on the canonical PUBLIC table (Phase E).
+    # seed_shopify no longer writes suppression rows; this guards that the connector
+    # seeds (tiktok S14 / sentry S24 / loop_returns S17) populated public. The
+    # suppression_stack predicate is dropped (client-only column, retired in Step 3).
+    check('public.suppression_log present (connector-seeded)',
+          f"""SELECT COUNT(*) FROM public.suppression_log
+              WHERE client_id = '{CLIENT_ID}'""",
+          lambda n: n is not None and n >= 20)
 
     # Check 11: BNPL orders exist from Month 10 (March 2025) onward
     check('BNPL orders present from March 2025',
@@ -2786,8 +2619,8 @@ def main() -> None:
         logger.info('Step 11/12 â€” seed_alert_log')
         seed_alert_log(cur)
 
-        logger.info('Step 12/12 â€” seed_suppression_log')
-        seed_suppression_log(cur)
+        # Phase E Step 2: seed_suppression_log removed — public.suppression_log
+        # is canonical (connector-seeded). seed_shopify no longer writes it.
 
         # --- Phase D (R11): integrity gate runs BEFORE commit -----------------
         # Commit is conditional. Any CRITICAL failure rolls the ENTIRE seed back.
