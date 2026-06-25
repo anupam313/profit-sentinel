@@ -401,6 +401,12 @@ def create_tables(cur) -> None:
     for ddl in [DDL_TIKTOK_CAMPAIGNS, DDL_TIKTOK_AD_PERF,
                 DDL_TIKTOK_ORGANIC, DDL_SUPPRESSION_LOG]:
         cur.execute(ddl)
+    # RULE 8 durability: enable RLS (deny-all, no policy) co-located with CREATE so it survives
+    # a from-scratch rebuild; REVOKE the Supabase default-ACL grants (pg_default_acl re-grants
+    # anon/authenticated full DML incl. TRUNCATE on every CREATE) — owner REVOKE removes them
+    # regardless of granting role. Both idempotent.
+    cur.execute("ALTER TABLE public.suppression_log ENABLE ROW LEVEL SECURITY;")
+    cur.execute("REVOKE ALL ON public.suppression_log FROM anon, authenticated;")
     logger.info('create_tables | all four tables ensured')
 
 
