@@ -18,6 +18,7 @@ sources:
       - name: klaviyo_email_events
       # Gorgias (Airbyte-managed)
       - name: gorgias_tickets
+      - name: gorgias_ticket_tags
       # GA4 (manually managed, has is_synthetic)
       - name: ga4_sessions_daily
       - name: ga4_funnel_daily

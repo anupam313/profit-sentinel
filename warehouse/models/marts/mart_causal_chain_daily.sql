@@ -52,10 +52,22 @@ meta_rolling as (
 ),
 
 -- Daily sizing-complaint counts from Gorgias
+-- C1 sizing signal sourced from the REAL Gorgias tags (jsonb array of {name}),
+-- not the deprecated last_ticket_reason scalar. A ticket counts ONCE if ANY of
+-- its tags is in the sizing-tag set below (quality tags excluded by design).
 sizing_daily as (
     select
         ticket_date                                                              as date,
-        sum(case when last_ticket_reason = 'sizing_issue' then 1 else 0 end)   as sizing_count,
+        sum(case when exists (
+                select 1
+                from jsonb_array_elements(tags) as e(elem)
+                where elem ->> 'name' in (
+                    'too small', 'too big', 'runs small', 'wrong size', 'fit',
+                    'sizing', 'sizing_issue', 'sizing_issue_tops',
+                    'runs small -- tops', 'fit issue -- tops', 'outerwear fit',
+                    'layering issue'
+                )
+            ) then 1 else 0 end)                                                 as sizing_count,
         count(*)                                                                 as total_count
     from {{ ref('stg_gorgias_tickets') }}
     group by ticket_date
