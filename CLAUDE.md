@@ -225,6 +225,17 @@ orchestrator — intentional pre-pilot).
    seed_sku_cost_master, seed_google_ads). 
    Seed order is NOT fixed.
 
+1b. Harden public schema — run LAST, after ALL 
+   seeds, before dbt: 
+   `python connectors/_harden_public_schema.py`. 
+   Idempotent, existence-guarded, fail-closed. 
+   Authoritative durability home for public-schema 
+   RLS + anon/authenticated revoke (owed H). An 
+   explicit final step ON PURPOSE — NOT wired into 
+   any connector seed: the sweep must run after 
+   every public table exists and seed order is not 
+   fixed.
+
 2. dbt — from `warehouse/`, the canonical command 
    is `dbt build` (run + test in one): 
    `cd warehouse && dbt build`. `dbt build` 

@@ -1641,6 +1641,22 @@ CREATE TABLE public.sku_cost_master (
 -- Every suppression event logged for auditability
 -- Founder can query: "Why didn't I get an alert on [date]?"
 -- Agent A writes to this table on every State 2, 3, or 4 suppression.
+> **Public-schema RLS posture & durability (owed item H/I — live + durable passes landed 2026-06-26).**
+> Every public application table has **RLS enabled with NO policy** = deny-all for `anon` /
+> `authenticated`; the per-client JWT policy is a separate post-pilot owed item (D). The privileged
+> write path is unaffected — RLS is **not** FORCEd, and `postgres` / `service_role` (the roles every
+> PS caller uses via `DATABASE_URL`) retain full table privileges. `anon` / `authenticated` grants are
+> revoked on all public tables, and `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public`
+> stops a new public `CREATE` from silently re-granting them. **Authoritative durability home:
+> `connectors/_harden_public_schema.py`** (idempotent, existence-guarded; run as the final standalone
+> bring-up step (CLAUDE.md RUN PATH 1b: `python connectors/_harden_public_schema.py`), after all seeds
+> and before dbt — deliberately NOT wired into any connector seed, since seed order is not fixed).
+> **Known residual:** the `supabase_admin` default ACL
+> still re-grants `anon`/`authenticated` on dashboard-created tables — `postgres` is neither a member
+> of nor superuser over `supabase_admin`, so it is documented, not altered. The CREATE TABLE blocks
+> elsewhere in this file predate this hardening and do not show the RLS/REVOKE statements;
+> connectors/_harden_public_schema.py is the source of truth for the live RLS + grant state.
+
 CREATE TABLE public.suppression_log (
     id                      bigint generated always as identity primary key,
     client_id               text not null,
