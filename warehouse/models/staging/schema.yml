@@ -107,6 +107,21 @@ models:
       - name: return_date
         tests: [not_null]
 
+  - name: stg_loop_return_line_items
+    description: "Filtered Loop return line items (one row per line_item_id). RULE-3 per-client synthetic filter applied here; provenance is transitive via the parent loop_returns header."
+    columns:
+      - name: line_item_id
+        tests: [unique, not_null]
+      # not_null on return_id is the orphan tripwire: a broken transitive join
+      # (line item with no header) surfaces loudly here rather than silently
+      # leaking as real.
+      - name: return_id
+        tests: [not_null]
+      - name: sku
+        tests: [not_null]
+      - name: return_reason_primary
+        tests: [not_null]
+
   - name: stg_sentry_errors
     description: "Sentry errors by date, hour, type, and browser."
     columns:
