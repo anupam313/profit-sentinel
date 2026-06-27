@@ -59,3 +59,16 @@ recruitment.
   continuity artifact is authored in chat, then CC-verified. CC does not author continuity files.
 - Open verify for next session: re-check all 9 handles vs HEAD; confirm rev-list count (expect 18,
   the number most likely to drift); record the PostgREST toggle answer.
+
+## Post-close addendum (2026-06-26, later same day)
+After the H-close commit, two read-only audits + one decision (full detail in the state file's POST-CLOSE
+ADDENDUM):
+- Seeding completeness audit -> PARTIAL: data effectively complete (10 connectors, provenance isolatable,
+  marts full-grain, 51/51 dbt tests); gaps are GA4 secondary tables (S3-P1/P2) + uncommitted Group B.
+- Fidelity audit (prompted by the founder's point that synthetic seeds must match CURRENT API contracts or
+  first client connect holds surprises): Google Ads + Meta faithful on join-critical shape. The real find —
+  the HERO return-reason join is wired Loop-only while pilot_scope §4/§6 say Shopify-native is primary
+  (internal spec-vs-wiring contradiction). Decided: wire to native. Live Shopify docs then showed the native
+  returnReason enum is deprecated (2026-01) for returnReasonDefinition.handle, so the parser must target the
+  handle. Read-only discovery prompt ready; build is pilot-critical (HERO fired) but not on the recruitment
+  path — only bites for a non-Loop brand. New owed item J in the state file.

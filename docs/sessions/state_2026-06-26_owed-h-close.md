@@ -1,6 +1,6 @@
 ## SESSION OPEN — LOAD FIRST (do this before any work)
-- THIS PAIR'S SELF-HANDLES: state_2026-06-26_owed-h-close.md = 160 lines;
-  chat_context_2026-06-26_owed-h-close.md = 61 lines. If either file's real wc -l differs from
+- THIS PAIR'S SELF-HANDLES: state_2026-06-26_owed-h-close.md = 202 lines;
+  chat_context_2026-06-26_owed-h-close.md = 74 lines. If either file's real wc -l differs from
   these, a stale/truncated copy is mounted: STOP and ask for the live copy.
 - Load docs/save_protocol.md FIRST (governs every save). Handle 149 is CARRIED (untouched this
   session, not re-verified here) — re-verify at HEAD like the rest.
@@ -138,6 +138,48 @@ below and is NOT yet verified. Do not treat F as optional cleanup.)
      _harden_public_schema.py someday (COSMETIC — durability already achieved in place);
      the 3 read-only probe scripts (keep for pre/post re-runs OR delete — FOUNDER DECISION PENDING;
      either way they never enter a commit). Re-upload-to-Project RETIRED — paste-on-request.
+
+## POST-CLOSE ADDENDUM (2026-06-26, later same day) — seeding + fidelity audits + HERO reason-source decision
+Authored AFTER the H-close commit (a6f3828); not part of that commit's scope. Records open threads from
+later the same day so they survive into the next chat. (Its own commit will increment HEAD + the stack
+count again — reconcile live at next open; do not trust a baked number.)
+
+### Seeding completeness audit (read-only) — verdict: PARTIAL
+- Data effectively complete: all 10 connectors populated; provenance cleanly isolatable (DEBT-006
+  predicates; only 1-row Airbyte probe residuals); 5 marts at full 730-day grain; 51/51 dbt tests PASS.
+- Two real gaps: (1) GA4 secondary tables empty (pages/devices/conversions/DAU/events/traffic) = known
+  S3-P1/P2 items; (2) repo hygiene — seed_google_ads.py + seed_b4_patch.py UNTRACKED, seed_meta.py
+  MODIFIED (Group B, owed I). Seed DATA is live; the seed CODEBASE is not fully committed.
+
+### Seed-vs-current-API fidelity audit (read-only) — Google Ads + Meta FAITHFUL; Shopify = the find
+- Google Ads FAITHFUL: cost_micros bigint + product_id present; mart B-9 reads cost_micros/1e6 correctly;
+  seed pins v24.1 (= current major v24). Note (not a blocker): seed is ONE blended table vs Airbyte's
+  per-stream split (shopping_performance_view separate) — staging may need per-stream awareness at connect.
+- Meta FAITHFUL: spend + numeric insights stored as TEXT (matches v25 string contract); cast lives in
+  stg_meta_ad_performance (spend::numeric) — real connector also returns strings -> same cast -> types match.
+  content_ids ARRAY carries the HERO join. Expected synthetic gap: static snapshot, NO 28-day rolling
+  restatement — handle at connector incremental config, not now.
+
+### HERO reason-source — CONTRADICTION found + DECISION made (NEW owed item J)
+- CONTRADICTION: the HERO return-driver reason join is wired LOOP-ONLY (mart_return_rate_by_sku reads
+  loop_return_line_items.return_reason_primary), but pilot_scope §4/§6 say Shopify-NATIVE is PRIMARY, Loop
+  opportunistic. Native reason IS seeded in shopify_order_refunds.return (jsonb) but NEVER parsed. This is
+  an internal spec-vs-wiring contradiction, NOT API drift.
+- IMPACT: HERO is the lead FIRED pilot alert (pilot_scope §3 defensible core). As wired it silently needs a
+  Loop brand; for a native-only (non-Loop) brand the reason join has no source. NOT built to §4 spec.
+- DECISION (founder, this session): wire HERO to Shopify-native — native primary, Loop supplement.
+- NEW API FINDING (live Shopify docs, 2026-01): the native returnReason ENUM is DEPRECATED in favor of
+  returnReasonDefinition {handle,name}. The parser MUST target the stable HANDLE (enum as fallback) — else it
+  ships against a sunsetting field (the exact first-connect surprise the fidelity check was hunting).
+- STATUS: read-only DISCOVERY PROMPT READY, NOT yet run. It pins: (§1) seeded jsonb shape; (§2 load-bearing)
+  whether the seed models returnReasonDefinition/handle vs only the dead enum vs an invented shape — if only
+  the dead enum, the SEED itself needs a shape fix FIRST; (§3) line_item_id->sku join path; (§4) native-vs-Loop
+  reason taxonomy reconciliation to ONE canonical category; (§5) downstream readers of the Loop-only
+  `returned` CTE before any repoint.
+- PRIORITY: pilot-critical (HERO is fired) -> when a BUILD session happens this OUTRANKS owed E / R2 as the
+  highest-value build follow-on. But NOT on the recruitment critical path — it only bites at first NON-LOOP
+  brand connect. Recruitment still gates everything. (This SUPERSEDES the NEXT ACTION "E or R2 highest-value"
+  line below.)
 
 ## OPEN — founder's check (does not block anything; fix already shipped either way)
 - Supabase Data API / PostgREST toggle (Settings -> API). If ON: the historical anon/auth grants
