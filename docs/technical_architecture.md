@@ -839,7 +839,7 @@ warehouse/
 │   └── marts/
 │       ├── schema.yml
 │       ├── mart_net_revenue_daily.sql
-│       ├── mart_return_rate_by_sku.sql     (to be created)
+│       ├── mart_return_rate_by_sku.sql     (built — J-2, bd46884)
 │       ├── mart_cross_source_daily.sql     (to be created)
 │       ├── mart_influencer_roi.sql         (to be created)
 │       └── mart_causal_chain_daily.sql     (to be created)
@@ -1453,6 +1453,18 @@ Loop Returns data must be segmented by return lag in staging tables. Different l
 Add `return_lag_segment` field to Loop staging tables. Alert B-series and return-rate alerts must segment by lag before computing return rate — pooling all three segments produces misleading signal.
 
 **Return reason contamination note:** Loop return reason codes are unreliable. Customers choose the closest available option, not the accurate one. "Didn't like the colour" often means poor product photography. "Too small" often means inaccurate size chart relative to fit model used. When both Gorgias complaint text AND Loop reason code exist for the same order, Agent B weights Gorgias text over Loop reason code for sizing and fit causal chains.
+
+**HERO return-reason source (mart_return_rate_by_sku) — J-2 (bd46884).** The SKU-level
+return-driver mart derives `primary_return_reason` native-PRIMARY with a Loop SUPPLEMENT:
+`COALESCE(native_return_reason_handle, loop_return_reason_primary)`. The native leg reads a
+Shopify-native return-reason handle and is currently INERT (a `where false` scaffold) because
+`shopify_order_refunds.return` is 100% NULL pre-pilot and its nesting/casing is unconfirmed — so
+today the mart resolves 100% to the Loop reason, output-identical to the prior wiring. At first live
+connect (J-1) the native handle is wired (unnest `refund_line_items` → sku, extract the return-reason
+handle, map to canonical handles, filter via staging), making Shopify-native the primary reason and
+Loop the fallback. The mart reads the RULE-3-filtered `stg_loop_return_line_items` staging model,
+never raw Loop tables. This is the mart-derivation layer and is distinct from Agent B's
+Gorgias-over-Loop weighting above, which is unchanged.
 
 ### Self-Extending Graph — Promotion Mechanism
 

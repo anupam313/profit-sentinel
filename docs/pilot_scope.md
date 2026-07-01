@@ -52,7 +52,7 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
 **Fired (pushed through the relevance gate):**
 - **Return-driver (HERO)** — "Campaign/collection X funds product P, which returns at 2× your average; 70%
   'too small' — fix the size guide or rein in spend." Shopify return rate + reason × product-level spend
-  (Meta product_id / Google shopping_performance_view). No revenue attribution; routes around lossy data.
+  (Meta product_id / Google shopping_performance_view). No revenue attribution; routes around lossy data. [J-2 plumbing status, bd46884: reason is derived native-PRIMARY / Loop-supplement; the Shopify-native leg is scaffolded but INERT until first live connect (J-1) — pre-pilot the mart resolves 100% to Loop, so HERO demos on Loop-carrying brands today and gains the native reason at connect. Consistent with §6's locked "Shopify native Returns API is primary" note.]
 - **C1 — sizing-complaint velocity** — leading indicator (Gorgias × Shopify/Loop); validated retrospectively
   from a brand's HISTORICAL Gorgias data (did past complaint spikes precede return spikes?). Fires if history
   supports it; else stays quiet for that brand. The only "warns before it happens" alert.
