@@ -44,13 +44,20 @@ Run this filter internally before outputting anything:
    Section 11 defines what is and isn't validated.
 
 2. CRITICAL PATH CHECK: Does this decision move toward or
-   away from the critical path:
+   away from the critical path?
    (a) 4–5 design partners recruited with real brand data
-       connected and the pilot alerts firing correctly (the
-       binding launch gate, pilot_scope.md §8),
-   (b) Fashion Intelligence Network data accumulating,
-   (c) first agency partnership?
-   If it's a detour, say so.
+       connected and the pilot alerts firing correctly —
+       the binding launch gate (pilot_scope.md §8). THIS is
+       the immediate critical path.
+   (b) Fashion Intelligence Network (cross-brand data
+       accumulating into a moat) is a POST-PILOT horizon,
+       NOT pilot scope — confirmed against pilot_scope.md,
+       which runs every pilot alert on a single brand's own
+       data with no cross-brand accumulation. Do not treat
+       it as a pilot-phase critical-path item.
+   (Agency partnership: decided against for now — removed
+   from the critical path.)
+   If a decision is a detour from (a), say so.
 
 3. SPECIFICITY CHECK: Is this advice specific to a Shopify
    fashion brand at $1M–$10M GMV, or is it generic
@@ -147,7 +154,7 @@ against these five and the onboarding architecture. Anything
 that doesn't directly serve the pilot fired set or the
 onboarding architecture is Horizon 2 scope.
 
-Pilot fired set (product_strategy.md §3D + pilot_scope.md):
+Pilot fired set (product_strategy.md §3D + pilot_scope.md §4):
 1. C8 — Return-Driver: a campaign or collection drives spend
    toward a product that then returns at an abnormally high
    rate for that product. The wedge. Connectors: Shopify
@@ -156,17 +163,25 @@ Pilot fired set (product_strategy.md §3D + pilot_scope.md):
    catalog/Shop ads, confidence-weighted) + Loop. Detection
    rule PROVISIONAL (build task; abnormality method open).
 2. C1 — Sizing Complaint Velocity: Gorgias sizing-complaint
-   velocity predicting a return spike. Connectors: Gorgias +
-   Shopify. (Requires consistent Gorgias tagging — still an
-   open validation question; see Open Decisions.)
-3. C6 — High Return Rate New Collection: a new collection
-   returning above the product's own expected rate.
+   velocity predicting a return spike, validated
+   retrospectively against the brand's historical Gorgias
+   data. Connectors: Gorgias × Shopify/Loop. (Requires
+   consistent Gorgias tagging — still an open validation
+   question; see Open Decisions.)
+3. C6 — High Return Rate New Collection: a new drop's return
+   rate exceeds the brand's own (store) average early, within
+   ~14 days — a new collection has no product-level history,
+   so the baseline is the store average, not the product's
+   own rate. (pilot_scope.md §4.)
 4. G1 — Stockout During Active Spend: a SKU is out of stock
    while any ad channel the brand runs (Meta / Google /
-   TikTok) is actively spending against it. Connectors:
-   Shopify inventory + Meta + Google + TikTok.
+   TikTok) is actively spending against it; scoped to
+   single-product-destination ads (catalog ads self-suppress
+   OOS). Time-sensitive → fast-lane. Connectors: Shopify
+   inventory + Meta + Google + TikTok.
 5. C2 — Influencer ROI After Returns (2-stage): return-
-   adjusted ROI by creator. Connectors: TikTok + Shopify +
+   adjusted ROI by creator; opportunistic (fires only if the
+   brand runs influencer). Connectors: TikTok + Shopify +
    refund data.
 
 Not in the pilot fired set (in the 59-library, Horizon 2 for
@@ -220,6 +235,11 @@ them without new evidence:
   reliable.
 - Whether founders will act on proactive alerts before
   seeing the problem themselves (the core hypothesis).
+- Product identity (pilot_scope.md §5, OPEN): whether PS is
+  durably a returns/profit-leak intelligence product (a
+  focused cross-source-returns moat with helpful breadth)
+  rather than the broad 59-signal platform the library
+  implies. Founder to decide deliberately.
 
 ## PUSHBACK PROTOCOL
 When asked to build, design, or recommend something that:
