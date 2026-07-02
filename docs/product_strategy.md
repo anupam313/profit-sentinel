@@ -55,7 +55,7 @@ NEW: "Profit Sentinel explains WHY something is happening across data
 
 **Design principle:** For sub-$5M brands, the value is NOT detection — founders already know something is wrong. The value is cross-source EXPLANATION across data they cannot join manually.
 
-**Important scope note:** These five are the Phase 1 day-one alerts — the subset that fires immediately with Phase 1 connectors only and requires no historical depth. The full alert library contains 58 alert types (A1–G4 business alerts + H1–H19 system alerts). All 58 are active in Agent A — the others fire as Phase 2 connectors come live and as historical depth accumulates. The five below are not a product limitation; they are the guaranteed day-one cross-source value for any brand onboarding with Phase 1 connectors only.
+**Important scope note:** These five are the Phase 1 day-one alerts — the subset that fires immediately with Phase 1 connectors only and requires no historical depth. The full alert library contains 59 alert types (A1–G4 business alerts + H1–H19 system alerts, plus C8). All 59 are active in Agent A — the others fire as Phase 2 connectors come live and as historical depth accumulates. The five below are not a product limitation; they are the guaranteed day-one cross-source value for any brand onboarding with Phase 1 connectors only.
 
 ### Alert 1: True Post-Return ROAS by Channel
 **Sources:** Shopify + Meta + TikTok + Google Ads
@@ -229,11 +229,11 @@ design session.
 
 ---
 
-## 3D. Alert Library — Full 58-Type Specification
+## 3D. Alert Library — Full 59-Type Specification
 *Written May 2026. Replaces placeholder. All decisions locked.*
 
 ### Overview
-58 alert types across 8 groups (A–H). Each alert has:
+59 alert types across 8 groups (A–H). Each alert has:
 - A unique code (A1, B3, H7 etc.)
 - A plain-English name
 - **Actionability classification:** High-Actionability / Monitor-and-Wait / Diagnostic-Only
@@ -247,7 +247,7 @@ design session.
 - **B:** Action-confounded — founder's action changes outcome, making direct verification impossible. Requires cross-client validation.
 - **C:** Structurally unverifiable. Agent D always communicates explicit uncertainty in plain English. May never reach 95% precision.
 
-**H-series note:** H1–H19 are system health and DQ alerts (extended to H19 in the May 2026 session). Total alert codes: 58 (A1–G4 = 39 business alerts, H1–H19 = 19 system alerts).
+**H-series note:** H1–H19 are system health and DQ alerts (extended to H19 in the May 2026 session). Total alert codes: 59 (A1–G4 = 39 business alerts, H1–H19 = 19 system alerts, plus C8 return-driver = 1).
 
 ---
 
@@ -256,16 +256,16 @@ design session.
 **A1 — True Post-Return ROAS by Channel**
 - Actionability: High-Actionability
 - Verification: A
-- What it detects: Blended ROAS hiding channel-level gaps. Post-return ROAS on Meta vs TikTok diverges >20% when measured net of Loop returns.
-- Connectors required: Shopify + Meta + TikTok + Loop Returns
+- What it detects: Blended ROAS hiding channel-level gaps. Post-return ROAS diverges >20% across the channels the brand runs (Meta / Google / TikTok) when measured net of Loop returns. Covers every channel the brand actually runs; a channel that isn't connected is disclosed, never treated as zero.
+- Connectors required: Shopify + Meta + Google Ads + TikTok + Loop Returns
 - Confidence floor: 65%
 - DQ weights: shopify_orders 0.40, shopify_refunds 0.25, meta_attribution 0.20, tiktok_attribution 0.10, loop_returns 0.05
 
 **A2 — Root Cause of ROAS Drop Already Noticed**
 - Actionability: High-Actionability
 - Verification: A
-- What it detects: ROAS drop already visible to founder. Explains which of four causes is responsible: CPM inflation, creative fatigue, checkout errors, or SKU return rate outlier.
-- Connectors required: Meta + Shopify + GA4 + Sentry
+- What it detects: ROAS drop already visible to founder. Explains which of four causes is responsible, across the channels the brand runs (Meta / Google / TikTok): CPM inflation, creative fatigue, checkout errors, or SKU return rate outlier. Per-channel root-cause attribution (which channel's CPM/creative drove the drop) is a build item; where channel attribution is ambiguous the alert names the channel it is confident about and flags the ambiguity rather than forcing a single-channel verdict.
+- Connectors required: Meta + Google Ads + TikTok + Shopify + GA4 + Sentry
 - Confidence floor: 70%
 - DQ weights: meta_ad_performance 0.50, shopify_orders 0.30, ga4_sessions 0.15, sentry_errors 0.05
 
@@ -288,15 +288,15 @@ design session.
 **A5 — Blended CAC Exceeding LTV Threshold**
 - Actionability: Monitor-and-Wait
 - Verification: B
-- What it detects: 90-day blended CAC has crossed the founder-configured LTV threshold in client_config.ltv_cac_warning_threshold.
-- Connectors required: Meta + TikTok + Shopify
+- What it detects: 90-day blended CAC has crossed the founder-configured LTV threshold in client_config.ltv_cac_warning_threshold. Blended CAC covers every ad channel the brand runs (Meta + Google + TikTok); an unconnected channel is disclosed, never treated as zero spend.
+- Connectors required: Meta + Google Ads + TikTok + Shopify
 - Confidence floor: 70%
 
 **A6 — Return-Adjusted Revenue by Channel Cohort**
 - Actionability: Diagnostic-Only
 - Verification: A
-- What it detects: Revenue attributed to a channel cohort drops materially once Loop return data applied (21-day cohort lookback).
-- Connectors required: Shopify + Loop Returns + Meta + TikTok
+- What it detects: Revenue attributed to a channel cohort drops materially once Loop return data applied (21-day cohort lookback). Covers every channel the brand runs (Meta / Google / TikTok); an unconnected channel is disclosed, never treated as zero.
+- Connectors required: Shopify + Loop Returns + Meta + Google Ads + TikTok
 - Confidence floor: 60%
 
 **A7 — Wholesale Order Contamination Warning**
@@ -323,8 +323,8 @@ design session.
 **B2 — Ad Spend Concentration Risk**
 - Actionability: Monitor-and-Wait
 - Verification: B
-- What it detects: >60% of total paid spend concentrated in one ad set or creative — single point of failure risk if creative fatigues or ad set enters learning phase.
-- Connectors required: Meta + TikTok
+- What it detects: >60% of total paid spend concentrated in one ad set or creative — single point of failure risk if creative fatigues or ad set enters learning phase. Total paid spend covers every ad channel the brand runs (Meta + Google + TikTok); an unconnected channel is disclosed, never treated as zero spend.
+- Connectors required: Meta + Google Ads + TikTok
 - Confidence floor: 70%
 
 **B3 — TikTok Organic-to-Paid Gap**
@@ -351,7 +351,7 @@ design session.
 
 ---
 
-### Group C — Returns and Product Quality (C1–C7)
+### Group C — Returns and Product Quality (C1–C8)
 
 **C1 — Sizing Complaint Velocity (Alert 5)**
 - Actionability: High-Actionability
@@ -376,7 +376,7 @@ design session.
 **C3 — SKU Return Rate Outlier Confirmed**
 - Actionability: High-Actionability
 - Verification: A
-- What it detects: Specific SKU return rate >2x brand average sustained 7+ days. Stage 3 of three-stage return warning chain — outcome confirmation, not new signal.
+- What it detects: Specific SKU return rate abnormally high for that product (rarity vs the product's own history) sustained 7+ days. Stage 3 of three-stage return warning chain — outcome confirmation, not new signal.
 - Connectors required: Shopify + Loop Returns
 - Confidence floor: 75%
 
@@ -408,6 +408,14 @@ design session.
 - Connectors required: Shopify + Loop Returns + Klaviyo profiles
 - Confidence floor: 65%
 
+**C8 — Return-Driver**
+- Actionability: pending (detection design)
+- Verification: pending (detection design)
+- What it detects: A specific campaign or collection drives spend toward a product that then returns at an abnormally high rate for that product (rarity vs the product's own history). Links product-level ad spend to product-level returns. Precise abnormality/materiality rule pending final detection design (see Pilot Readiness Register).
+- Connectors required: Shopify returns + Meta (product_id) + Google (shopping_performance_view); TikTok product-level where the brand runs catalog/Shop ads, treated as a confidence-weighted signal; Loop Returns (current return-reason source until Shopify-native at first connect)
+- Confidence floor: pending (detection design)
+- Note: A2 is retired from the pilot fired set; its return-driver concern is owned by C8. The A2→C8 lineage note lives on A2's causal_graph.py entry (code), not in this section.
+
 ---
 
 ### Group D — Contribution Margin and Profitability (D1–D6)
@@ -416,8 +424,9 @@ design session.
 - Actionability: High-Actionability
 - Verification: B
 - What it detects: Contribution margin compressing below founder-configured floor. Root cause decomposed into five components: CPM inflation, rising return rate, COGS increase, discount depth increase, operational cost increase. Component-level suppression applies.
-- Connectors required: Shopify + Meta + TikTok + Loop Returns + sku_cost_master
+- Connectors required: Shopify + Meta + Google Ads + TikTok + Loop Returns + sku_cost_master
 - Confidence floor: 65%
+- Note: the CPM-inflation and ad-spend components cover every ad channel the brand runs (Meta + Google + TikTok); an unconnected channel is disclosed, never treated as zero spend.
 - DQ weights: shopify_orders 0.30, shopify_inventory_items 0.25, meta_ad_performance 0.20, tiktok_ad_performance 0.10, loop_returns 0.10, client_config 0.05
 - **Seasonality:** Use same-week-prior-year baseline. Fall back to 90-day rolling median if <52 weeks of data. Never mix baselines within one alert.
 
@@ -557,8 +566,8 @@ design session.
 **G1 — Stockout During Active Spend**
 - Actionability: High-Actionability
 - Verification: A
-- What it detects: A SKU is out of stock while Meta or TikTok is actively spending against it. Immediate budget waste.
-- Connectors required: Shopify inventory + Meta + TikTok
+- What it detects: A SKU is out of stock while any ad channel the brand runs (Meta / Google / TikTok) is actively spending against it. Immediate budget waste.
+- Connectors required: Shopify inventory + Meta + Google Ads + TikTok
 - Confidence floor: 80%
 - DQ weights: shopify_inventory_levels 0.50, meta_ad_performance 0.30, tiktok_ad_performance 0.20
 - Delivery: Immediate — bypasses 9am hold.
@@ -699,6 +708,7 @@ H-series alerts are system health and DQ alerts. Confidence floors are not thres
 | C5 | Return Reason Contamination | Diagnostic | C | 50% |
 | C6 | High Return Rate New Collection | High | A | 70% |
 | C7 | Repeat Customer Return Rate Rising | Monitor | B | 65% |
+| C8 | Return-Driver | pending | pending | pending |
 | D1 | Contribution Margin Compression | High | B | 65% |
 | D2 | Discount Dependency Creep | Monitor | B | 70% |
 | D3 | COGS Step Change Impact | Monitor | A | 75% |
@@ -907,8 +917,10 @@ Every gap type has a resolution path. Every resolution path has a fallback. Miss
 
 **Cross-source moment by minute 10 (Design Principle 8):** Onboarding must surface a cross-source insight that Shopify Sidekick cannot replicate before the founder completes setup. This is a hard product requirement — not a nice-to-have.
 
-### The Six Confirmation Questions
-These six questions run after staging completes, before marts run for the first time. Answers write to client_config. A definition change later triggers dbt full-refresh recomputing all historical marts.
+### The Confirmation Questions
+**Pilot flow — FIVE questions.** During the pilot the confirmation flow asks five questions (attribution is a single fixed basis — click-based, time-decay, 14-day — not a founder choice; see Q3). The **six-question** version below is the POST-PILOT full-product design, retained here as the target; the sixth question (the attribution-model chooser) is deferred to post-pilot.
+
+These questions run after staging completes, before marts run for the first time. Answers write to client_config. A definition change later triggers dbt full-refresh recomputing all historical marts.
 
 1. **COGS tier confirmation:** (updated 2026-05-26 — 4-tier architecture)
 
@@ -1090,7 +1102,7 @@ We're watching. You'll hear from us when it matters.
 - Connector list in headline is dynamic — only shows connected sources
 - "Your first alert will fire" language only used if ≥1 chain is at provisional or core tier
 - "Why did my ROAS drop?" in NLQ example is accurate at pilot — Agent B handles causal reasoning
-- Causal NLQ questions for chains not yet in the 58 return: "I can see X happened but I don't yet have enough data to identify the cause — I'm tracking it"
+- Causal NLQ questions for chains not yet in the 59 return: "I can see X happened but I don't yet have enough data to identify the cause — I'm tracking it"
 
 ---
 
@@ -1419,6 +1431,6 @@ interview before next session.
 
 8. **Cross-source moment visible by minute 10.** Onboarding must produce a cross-source insight that Shopify Sidekick cannot replicate before the founder has completed setup. This is a product requirement enforced at the onboarding architecture level. (Added May 2026.)
 
-9. **Alert precision over alert volume.** The 58 validated alert types are the floor, not the ceiling. The self-extending graph adds new alert types only after per-client and cross-network validation thresholds are met. A new alert type that fires without validated causal chain is a rule engine output, not intelligence. Never add alert types to increase product comprehensiveness — add them because real outcome data validated a new causal chain.
+9. **Alert precision over alert volume.** The 59 validated alert types are the floor, not the ceiling. The self-extending graph adds new alert types only after per-client and cross-network validation thresholds are met. A new alert type that fires without validated causal chain is a rule engine output, not intelligence. Never add alert types to increase product comprehensiveness — add them because real outcome data validated a new causal chain.
 
 10. **Intellectual honesty in every alert.** Agent D communicates uncertainty in plain English on every alert — not just a confidence score number. A founder who sees the system acknowledge what it doesn't know trusts the system more than one that always projects false certainty. The Evidence Stack is a trust mechanism; pre-fire uncertainty communication is how that trust is earned alert by alert.
