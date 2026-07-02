@@ -18,7 +18,7 @@
 The full product, automated end-to-end: same connectors, detection, system-generated reasoning,
 checks/gates, Evidence Stack, and alert language; delivered through the real surface (Shopify app +
 NLQ + email). Two — and only two — differences from full-scale PS:
-1. **Limited alert set** (the dense cross-source core), not the full 58-alert library / deep causal graph.
+1. **Limited alert set** (the dense cross-source core), not the full 59-alert library / deep causal graph.
 2. **One human relevance-gate.** The system fires an alert TO Anupam automatically; he checks whether the
    system's reasoning fits that specific brand; then releases it to the founder. He computes and
    orchestrates nothing by hand — he is a relevance/release check on automated output.
@@ -50,9 +50,10 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
 
 ### PILOT — build now, in the 6-week beta (the defensible core)
 **Fired (pushed through the relevance gate):**
-- **Return-driver (HERO)** — "Campaign/collection X funds product P, which returns at 2× your average; 70%
-  'too small' — fix the size guide or rein in spend." Shopify return rate + reason × product-level spend
-  (Meta product_id / Google shopping_performance_view). No revenue attribution; routes around lossy data. [J-2 plumbing status, bd46884: reason is derived native-PRIMARY / Loop-supplement; the Shopify-native leg is scaffolded but INERT until first live connect (J-1) — pre-pilot the mart resolves 100% to Loop, so HERO demos on Loop-carrying brands today and gains the native reason at connect. Consistent with §6's locked "Shopify native Returns API is primary" note.]
+- **C8 (return-driver)** — "Campaign/collection X funds product P, which returns abnormally high for that
+  product — fix the size guide or rein in spend." Shopify return rate + reason × product-level spend
+  (Meta product_id / Google shopping_performance_view; TikTok product-level where the brand runs catalog/Shop
+  ads, treated as a confidence-weighted signal). No revenue attribution; routes around lossy data. [J-2 plumbing status, bd46884: reason is derived native-PRIMARY / Loop-supplement; the Shopify-native leg is scaffolded but INERT until first live connect (J-1) — pre-pilot the mart resolves 100% to Loop, so C8 demos on Loop-carrying brands today and gains the native reason at connect. Consistent with §6's locked "Shopify native Returns API is primary" note.]
 - **C1 — sizing-complaint velocity** — leading indicator (Gorgias × Shopify/Loop); validated retrospectively
   from a brand's HISTORICAL Gorgias data (did past complaint spikes precede return spikes?). Fires if history
   supports it; else stays quiet for that brand. The only "warns before it happens" alert.
@@ -65,8 +66,9 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
   on the returns spine.
 
 **In-app metrics / lists (pulled via app + NLQ, NOT fired):**
-- **Blended post-return ROAS** (total revenue − returns ÷ total spend) — the headline "returns reality on your
-  own numbers" hook. Label ad-spend blended, not MER.
+- **Blended post-return ROAS** (total revenue − returns ÷ blended ad spend across every channel the brand
+  runs — Meta + Google + TikTok — with the covered channels disclosed; an unconnected channel is never
+  treated as zero spend) — the headline "returns reality on your own numbers" hook. Label ad-spend blended, not MER.
 - **Serial-offenders list** — quantified repeat-returner cost (a standing state, not an event).
 - **Return-rate + reason table** — the returns ground-truth view.
 
@@ -95,7 +97,7 @@ they are not "product alerts."
 
 ## 5. Identity question (OPEN — posed, not confirmed)
 Is PS, durably, a **returns/profit-leak intelligence product** (a focused, defensible moat with helpful breadth
-around it), rather than the broad 58-signal platform the library implies? The filter says the moat concentrates
+around it), rather than the broad 59-signal platform the library implies? The filter says the moat concentrates
 in cross-source returns; margin/conversion/retention are genuine-but-later expansion gated on COGS/Sentry/depth.
 Anupam to decide deliberately — this shapes the whole product journey.
 
