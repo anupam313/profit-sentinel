@@ -1387,7 +1387,7 @@ SSL: require
 
 ### Verification Category — Required Field on All Alert Types
 
-Every alert in the 41-type library must be assigned a `verification_category` before Agent B is built. This field is stored in `alert_log` and determines three things: how confidence score is calculated, how outcome is measured, and what language Agent D uses when delivering the alert.
+Every alert in the 59-type library must be assigned a `verification_category` before Agent B is built. This field is stored in `alert_log` and determines three things: how confidence score is calculated, how outcome is measured, and what language Agent D uses when delivering the alert.
 
 **Category A — Directionally Verifiable**
 Outcome is observable in the data independent of what the founder does. The alert's predicted outcome either arrives in the data or it doesn't.
@@ -1454,7 +1454,7 @@ Add `return_lag_segment` field to Loop staging tables. Alert B-series and return
 
 **Return reason contamination note:** Loop return reason codes are unreliable. Customers choose the closest available option, not the accurate one. "Didn't like the colour" often means poor product photography. "Too small" often means inaccurate size chart relative to fit model used. When both Gorgias complaint text AND Loop reason code exist for the same order, Agent B weights Gorgias text over Loop reason code for sizing and fit causal chains.
 
-**HERO return-reason source (mart_return_rate_by_sku) — J-2 (bd46884).** The SKU-level
+**C8 return-reason source (mart_return_rate_by_sku) — J-2 (bd46884).** The SKU-level
 return-driver mart derives `primary_return_reason` native-PRIMARY with a Loop SUPPLEMENT:
 `COALESCE(native_return_reason_handle, loop_return_reason_primary)`. The native leg reads a
 Shopify-native return-reason handle and is currently INERT (a `where false` scaffold) because
