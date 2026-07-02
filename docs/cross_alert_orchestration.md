@@ -8,7 +8,7 @@
 ## PURPOSE
 
 A single persistent record of every point where two or more alerts in the
-41-type library share a **root cause**, a **data signal**, a **delivery
+59-type library share a **root cause**, a **data signal**, a **delivery
 moment**, or a **baseline**, and therefore risk: contradictory verdicts to
 the same founder, duplicate messages about one event, or one alert
 suppressing/escalating another incorrectly.
@@ -35,7 +35,7 @@ constraint is that the consolidated Claude Code prompt comes after H.)
 ## BUILD METHOD
 
 - **Phase 1 (this version):** canonical-spec deep pass. Sources:
-  `product_strategy.md` Section 3D (full 41-type definitions),
+  `product_strategy.md` Section 3D (full 59-type definitions),
   `agent_d_build_spec.md` (G/F/E1 locked language + D1 Gaps 1–3),
   `technical_architecture.md` (shared mart columns, causal_graph entries,
   suppression infrastructure).
@@ -647,7 +647,7 @@ so it cannot be silently dropped.
 
 There are at least three different things all labelled "A1", "A2", etc.:
 
-1. **Section 3D 41-type library:** A1=Post-Return ROAS, A2=ROAS-drop root cause,
+1. **Section 3D 59-type library:** A1=Post-Return ROAS, A2=ROAS-drop root cause,
    … (the alert IDs we use in deliberation).
 2. **gap_abc_decisions.md "Gap A/B/C decisions":** A1=BFCM Suppression
    Corrected, A2=Monthly Floor Raised, A6=Three-Stage Return Chain, … These are
