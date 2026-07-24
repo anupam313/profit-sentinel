@@ -29,6 +29,7 @@ Timeline: **6 weeks to LAUNCH the beta**; the free pilot then runs **3–4+ mont
 The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not just the causal graph.
 
 ## 2. The human gate = a correctness LOG (CONFIRMED)
+- **The gate covers everything the founder receives during the pilot — fired alerts AND weekly digests**, not alerts alone; the two-column log, three exits and latency rules below apply to both. [Scope widened 2026-07-24: previously scoped to fired alerts only.]
 - Every alert that reaches the gate is logged with TWO columns: **(a) my-verdict vs system** (did the
   system's reasoning hold for this brand) and **(b) founder-outcome vs system** (did the founder act, was
   the system right). Column (b) is what later licenses removing the gate per alert (graduation — threshold OPEN).
@@ -66,7 +67,7 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
 - **C2 — influencer ROI after returns** — opportunistic (fires only if the brand runs influencer); near-free
   on the returns spine.
 
-**Delivered in the WEEKLY DIGEST EMAIL — first digest sent AT CONNECT, not at end of week one (NOT fired alerts):**
+**Weekly digest CONTENT (not fired alerts — but gated the same way):**
 - **Blended post-return ROAS** (total revenue − returns ÷ blended ad spend across every channel the brand
   runs — Meta + Google + TikTok — with the covered channels disclosed; an unconnected channel is never
   treated as zero spend) — the headline "returns reality on your own numbers" hook. Label ad-spend blended, not MER.
