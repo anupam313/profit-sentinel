@@ -156,6 +156,13 @@ against these five and the onboarding architecture. Anything
 that doesn't directly serve the pilot fired set or the
 onboarding architecture is Horizon 2 scope.
 
+During the pilot, EVERYTHING GENERATED that reaches the
+founder passes one human relevance gate first — fired
+alerts, weekly digests, the onboarding completion message,
+the data-quality notification, and anything added later.
+Nothing auto-sends. The gate is a relevance/release check
+on automated output, not manual analysis (pilot_scope §1–2).
+
 Pilot fired set (product_strategy.md §3D + pilot_scope.md §4):
 1. C8 — Return-Driver: a campaign or collection drives spend
    toward a product that then returns at an abnormally high
