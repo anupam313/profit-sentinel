@@ -1065,9 +1065,9 @@ When an alert arrives, you'll see exactly what's happening, why, and what to do.
 Agree, Snooze, or Disagree — every click teaches Profit Sentinel your business. The more 
 you respond, the sharper and more personalised your alerts become.
 
-The moment you connect, you'll get a first email from me — your blended post-return ROAS, your
-serial-offenders list, and a return-rate-and-reason table, all on your own numbers. After that,
-a weekly digest keeps the picture current. [Provisional copy — to be refined.]
+Beyond the alerts, a weekly digest gives you the wider picture — things like what your ads
+really earned once returns came out, which products come back most and why, and what repeat
+returns are costing you overall. All on your own numbers.
 
 For patterns I haven't seen before in your data, I'll tell you what I see and flag that 
 I'm still learning the cause — I get sharper the longer I run.
@@ -1091,9 +1091,9 @@ When an alert arrives, you'll see exactly what's happening, why, and what to do.
 Agree, Snooze, or Disagree — every click teaches Profit Sentinel your business. The more 
 you respond, the sharper and more personalised your alerts become.
 
-The moment you connect, you'll get a first email from me — your blended post-return ROAS, your
-serial-offenders list, and a return-rate-and-reason table, all on your own numbers. After that,
-a weekly digest keeps the picture current. [Provisional copy — to be refined.]
+Beyond the alerts, a weekly digest gives you the wider picture — things like what your ads
+really earned once returns came out, which products come back most and why, and what repeat
+returns are costing you overall. All on your own numbers.
 
 For patterns I haven't seen before in your data, I'll tell you what I see and flag that 
 I'm still learning the cause — I get sharper the longer I run.
