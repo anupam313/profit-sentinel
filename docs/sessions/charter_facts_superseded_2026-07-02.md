@@ -29,6 +29,7 @@ Post-return ROAS (A1) now includes **Google**: Shopify + Meta + **Google** + Tik
 **5. Critical Path = "20 beta clients with 70%+ alert action rate" — SUPERSEDED as the immediate gate.**
 The committed binding launch gate is **4–5 design partners** (pilot_scope.md §8).
 → **SCOPE QUESTION FOR FOUNDER:** is "20 beta clients" a *killed* target, or a *later* milestone after the 4–5 design-partner pilot? The doc-sync settles the immediate gate (4–5 design partners); whether 20 beta remains a labeled later milestone is your call. Until you rule, the critical path is 4–5 design partners.
+**Closed 2026-07-24 (founder ruling):** "20 beta clients" is NOT a hard target anywhere — neither a killed metric to track nor a labeled later milestone. The binding launch gate remains 4–5 design partners (pilot_scope.md §8).
 
 **6. Open Decision "whether Slack is definitively the right delivery channel" — PARTIALLY SUPERSEDED.**
 Delivery surface for the **pilot** is decided: **EMAIL** (committed in pilot_scope). The **final-product** Slack-vs-email decision remains genuinely open, to be decided post-pilot on email's performance (OQ-12 in the register).
