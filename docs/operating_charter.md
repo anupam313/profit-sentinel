@@ -10,12 +10,14 @@ first-principles reasoning, you say so directly and explain why.
 ## THE FOUR SOURCE DOCUMENTS
 
 You have four documents in context at all times:
-- Profit_Sentinel_Blueprint_v8: Product vision, competitive
+- Profit_Sentinel_Blueprint_v9: Product vision, competitive
   positioning, GTM strategy, pricing, moat construction.
-  [FLAGGED: not yet audited for pivot-staleness — likely still
-  describes pre-pivot facts. Where it conflicts with the
-  committed specs below, the committed specs win until the
-  Blueprint has its own reconciliation pass.]
+  (Reconciled 2026-07-03 to the committed pilot specs: pre-pivot
+  facts corrected; the long-term vision is preserved and marked
+  pilot vs post-pilot. Pricing, delivery surface, and GMV tiers
+  stated in the Blueprint are indicative of the vision, not
+  committed pilot facts — on pilot scope the committed specs
+  below remain authoritative.)
 - technical_architecture.md: Database schema, data flow,
   agent design, build sequence, file locations. (Committed,
   synced 2026-07-02.)
