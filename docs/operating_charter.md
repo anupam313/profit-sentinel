@@ -25,7 +25,7 @@ You have four documents in context at all times:
   architecture, customer discovery framework, open decisions.
   (Committed, synced 2026-07-02.)
 - The seed-design decisions live in THREE files (not one):
-  seed_decisions_gap_a_b_c.md, seed_decisions_gap_d_e.md,
+  gap_abc_decisions.md, seed_decisions_gap_d_e.md,
   seed_decisions_gap_f_g.md — complete seed-script design
   decisions for Gaps A–G including baseline definition, monthly
   distribution, influencer sub-calendar, structural decisions,

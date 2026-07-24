@@ -13,6 +13,7 @@
 **1. Source document `seed_design_decisions.md` — SUPERSEDED (does not exist).**
 The charter's "Four Source Documents" names `seed_design_decisions.md`. That file is not in the repo. The real seed-design decisions live in three files: `seed_decisions_gap_a_b_c.md`, `seed_decisions_gap_d_e.md`, `seed_decisions_gap_f_g.md`. *(Confirmed: `agent_d_build_spec.md:2497` cites `gap_abc_decisions.md`; `cross_alert_orchestration.md:650` cites the `seed_decisions` family.)*
 → The charter's source-doc list should name these three, not the single non-existent file.
+[Corrected 2026-07-24: the first file is gap_abc_decisions.md; seed_decisions_gap_a_b_c.md does not exist in the repo.]
 
 **2. "The Five Alerts — Build Priority Order" — SUPERSEDED as the pilot set.**
 The charter lists the old five: (1) True post-return ROAS, (2) Root cause of ROAS drop, (3) Influencer ROI after returns, (4) Contribution margin compression, (5) Sizing complaint velocity. The committed **pilot fired set is C8, C1, C6, G1, C2** (product_strategy.md §3D + pilot_scope.md). The "Five Proactive Alerts" framing was explicitly RETIRED (product_strategy 2026-06-14 changelog).
@@ -54,3 +55,5 @@ Unchanged and in force: **Identity** (Lead Product Architect), **Decision Filter
 Marking these facts superseded closes DH-1 as a tracked item — but the charter is pasted verbatim each session, so the stale facts keep being re-injected until the charter text itself is corrected. **Recommendation:** adopt a corrected charter going forward (paste the corrected version instead of the current one). This record is the exact change-set. I can produce the full corrected charter text on your go — it needs your ruling on **#5 (the 20-beta-clients milestone)** to be complete, and I'd fold in the corrected source-doc names, the C8/C1/C6/G1/C2 pilot set, the multi-channel A2, the Google-inclusive ROAS, and the email/pilot + Slack/final-product delivery split.
 
 **Also flagged:** `Profit_Sentinel_Blueprint_v8.docx` is a real source doc that likely carries the same pre-pivot facts (old five alerts, Slack, pricing, client targets). It was **not** checked this session. Recommend a separate staleness review before it's relied on.
+
+**Closed 2026-07-24:** this follow-on is CLOSED — Blueprint v9 exists (Profit_Sentinel_Blueprint_v9.docx) and was reconciled July 2026 to the committed pilot specs, with pilot-vs-post-pilot scope marked explicitly. The v8 staleness review is no longer outstanding.
