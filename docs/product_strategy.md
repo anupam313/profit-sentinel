@@ -892,7 +892,7 @@ Reason: Meta attribution gaps limit causal certainty
 Three rules:
 - Above 80%: Full Evidence Stack fires normally
 - 60-80%: Fires with caveat "Medium confidence — data gaps noted"
-- Below 60%: Alert suppressed, replaced with data quality fix notification
+- Below 60%: Alert suppressed, replaced with data quality fix notification — that notification is itself generated founder-facing output, so it passes the human relevance gate before sending, like everything else generated during the pilot
 
 ### Layer 1 — What
 Specific signal detected. No jargon, no percentage-of-percentage language.
@@ -1039,7 +1039,7 @@ Before confirmation questions, the system validates revenue against three gap ty
 
 ### Onboarding Completion Message
 
-Delivered in Slack after historical_pattern_scan.py completes. Two variants.
+Delivered by EMAIL after historical_pattern_scan.py completes. This message carries generated numbers — the headline lookback figure, the total dollar-leakage figure derived from Shopify GMV (not founder-stated), and three patterns each with a dollar impact — so, like every other generated founder-facing output during the pilot, it passes the human relevance gate before it is sent. Two variants.
 
 **Headline lookback rule:** Use the deepest single-source lookback (Shopify/Klaviyo as anchor — almost always longest). Per-source limitations handled silently in the scan. Short-history connectors (e.g. recently-added Gorgias) do not reduce the headline lookback number — their chains simply produce lower instance counts.
 
@@ -1427,6 +1427,7 @@ interview before next session.
 4. **No dead ends in onboarding.** Every gap type has a resolution path. Every resolution path has a fallback. Missing connectors become waitlist entries not error states.
 
 5. **Slack is the complete interaction surface.** Not a notification channel. Operational interaction — alerts, follow-ups, queries, approvals — all happen in Slack. Web app is configuration and audit only.
+   *(Pilot note 2026-07-24: the PILOT delivers by EMAIL; this principle describes the intended FINAL-PRODUCT surface. The email-vs-Slack call is open post-pilot — OQ-12 in the pilot readiness register.)*
 
 6. **Agent A never calls Claude.** Threshold scanning is pure Python. No LLM calls in the hot path. Claude is called only for natural language formatting and conversational responses.
 

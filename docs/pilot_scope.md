@@ -29,8 +29,8 @@ Timeline: **6 weeks to LAUNCH the beta**; the free pilot then runs **3–4+ mont
 The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not just the causal graph.
 
 ## 2. The human gate = a correctness LOG (CONFIRMED)
-- **The gate covers everything the founder receives during the pilot — fired alerts AND weekly digests**, not alerts alone; the two-column log, three exits and latency rules below apply to both. [Scope widened 2026-07-24: previously scoped to fired alerts only.]
-- Every alert that reaches the gate is logged with TWO columns: **(a) my-verdict vs system** (did the
+- **The gate covers EVERYTHING GENERATED that reaches the founder during the pilot** — every system-generated founder-facing output passes the gate, not a named list. Examples (non-exhaustive): fired alerts, weekly digests, the onboarding completion message, the below-60%-confidence data-quality notification — and anything added later, covered by default. The two-column log, three exits and latency rules below apply to all of them. [Scope widened 2026-07-24: previously scoped to fired alerts only.] [Widened again 2026-07-24: from a named list to everything generated, after two uncovered outputs were found.]
+- Everything that reaches the gate is logged with TWO columns: **(a) my-verdict vs system** (did the
   system's reasoning hold for this brand) and **(b) founder-outcome vs system** (did the founder act, was
   the system right). Column (b) is what later licenses removing the gate per alert (graduation — threshold OPEN).
 - Three exits: **send / reject-as-wrong / suppress-as-stale.** A stale alert (problem already resolved) is
