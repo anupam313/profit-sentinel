@@ -16,12 +16,14 @@
 
 ## 1. What the pilot is (CONFIRMED)
 The full product, automated end-to-end: same connectors, detection, system-generated reasoning,
-checks/gates, Evidence Stack, and alert language; delivered through the real surface (Shopify app +
-NLQ + email). Two — and only two — differences from full-scale PS:
+checks/gates, Evidence Stack, and alert language; delivered through EMAIL ONLY. The Shopify app is
+retained as the DATA CONNECTION (OAuth / install / sync), NOT as a founder-facing screen; natural-
+language query is removed from pilot scope. THREE differences from full-scale PS:
 1. **Limited alert set** (the dense cross-source core), not the full 59-alert library / deep causal graph.
 2. **One human relevance-gate.** The system fires an alert TO Anupam automatically; he checks whether the
    system's reasoning fits that specific brand; then releases it to the founder. He computes and
    orchestrates nothing by hand — he is a relevance/release check on automated output.
+3. **Reduced surface** — email only; no in-app founder-facing screen, no natural-language query.
 
 Timeline: **6 weeks to LAUNCH the beta**; the free pilot then runs **3–4+ months** on real brand data.
 The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not just the causal graph.
@@ -34,7 +36,6 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
   suppressed and logged, never sent late.
 - Max **1-day** latency to clear the gate; **intraday FAST-LANE** for time-sensitive alerts (G1). State the
   latency promise to founders per alert class, not as a flat number.
-- NLQ is **answer-or-abstain** (never guesses); it is a pilot-launch surface (the founder's day-one visibility).
 
 ## 3. The value-vs-moat filter (CONFIRMED — how alerts are judged)
 - **Value** = is the founder getting this today? Proactive alerting (dashboards display, they don't alert),
@@ -65,7 +66,7 @@ The 6 weeks is the whole product (connectors, surface, alerts, gate flow), not j
 - **C2 — influencer ROI after returns** — opportunistic (fires only if the brand runs influencer); near-free
   on the returns spine.
 
-**In-app metrics / lists (pulled via app + NLQ, NOT fired):**
+**Delivered in the WEEKLY DIGEST EMAIL — first digest sent AT CONNECT, not at end of week one (NOT fired alerts):**
 - **Blended post-return ROAS** (total revenue − returns ÷ blended ad spend across every channel the brand
   runs — Meta + Google + TikTok — with the covered channels disclosed; an unconnected channel is never
   treated as zero spend) — the headline "returns reality on your own numbers" hook. Label ad-spend blended, not MER.
@@ -80,6 +81,10 @@ E2/E3 (repeat-purchase decline / high-LTV quiet — only the DEEP cross-source v
 brand has clean GA4), G4 (back-in-stock window — when waitlist data flows). *Why Phase 2:* each needs real data
 to build the abnormality baselines and cross-source causal depth (synthetic can't), or to learn a dependency.
 Building them here also resolves parked questions (e.g., OP-1 grouping on real returns).
+
+- **C3 (SKU Return Rate Outlier Confirmed)** — PHASE 2. Shares the C8 abnormality rule (one shared
+  detection method, not a second rule). Thin-history behaviour is DECIDED: act with an explicit
+  seasonality caveat, not a 90-day monitor-and-wait.
 
 ### PARK — roadmap, not pilot/early (low-moat breadth or dependency-gated)
 B1–B5 (creative/campaign — all Meta-dashboard commodity), D2 (discount creep), D5 (Klaviyo flow revenue),
@@ -102,8 +107,15 @@ in cross-source returns; margin/conversion/retention are genuine-but-later expan
 Anupam to decide deliberately — this shapes the whole product journey.
 
 ## 6. Data access reality (LOCKED — from Points 1 & 2)
-- **Shopify:** full history via read_all_orders + PCD (developer-side, one-time); custom distribution app;
-  CSV fallback only. PII/PCD on the critical path. Start approvals now.
+- **Shopify:** full history via read_all_orders — the CRITICAL-PATH approval, start it early; custom distribution app;
+  CSV fallback only. Protected-customer-data REVIEW is NOT required for a custom-distribution app (Shopify grants
+  Levels 1 and 2 automatically to custom apps; only public apps require review). The protected-data REQUIREMENTS
+  still apply in full: encryption in transit and at rest; encrypted backups; test/production separation; retention
+  limits; staff access limits; access logging; an incident-response policy; and a data agreement with the merchant.
+  Start approvals now.
+  [Amended 2026-07-24 on new external evidence: Shopify's own protected-customer-data documentation states custom
+  apps have Level 1 and Level 2 access always available; public apps require review. The earlier "PCD on the critical
+  path" framing conflated the two. The read_all_orders approval remains on the critical path.]
 - **Meta/TikTok:** Airbyte Cloud OAuth (no own Meta/TikTok app at pilot scale); Meta lost 7d/28d-view on Jan 12 2026;
   product_id via Airbyte Custom Insight (config); v5.2.7+; build on current Advantage+ structures.
 - **Google Ads:** developer token = the real long pole (own credentials; entity helps) — start now;

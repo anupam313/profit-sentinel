@@ -169,7 +169,10 @@ Pilot fired set (product_strategy.md §3D + pilot_scope.md §4):
    retrospectively against the brand's historical Gorgias
    data. Connectors: Gorgias × Shopify/Loop. (Requires
    consistent Gorgias tagging — still an open validation
-   question; see Open Decisions.)
+   question; see Open Decisions. Committed direction: PARSE
+   TICKET TEXT rather than trust tags (product_strategy,
+   2026-06-04); the parser is PENDING BUILD and the open item
+   lives in the pilot readiness register.)
 3. C6 — High Return Rate New Collection: a new drop's return
    rate exceeds the brand's own (store) average early, within
    ~14 days — a new collection has no product-level history,
@@ -218,8 +221,13 @@ return rate vs brand average
 Always establish Seasonality Context before calling
 something a crisis: SS (Spring/Summer) and FW (Fall/Winter)
 collection drop periods produce predictable CPM spikes,
-return spikes, and conversion fluctuations. The Precision
-Profit Calendar (Moat 1) is specifically designed to
+return spikes, and conversion fluctuations. In the PILOT this is
+done by the seasonal baseline (D6) — which pilot_scope §4 calls
+essential pilot plumbing — together with the brand event calendar
+built from the brand's own history. The Precision Profit Calendar
+(Moat 1) is the POST-PILOT full version of this mechanism; it runs
+on existing data (the 12-month figure is a data-availability and
+switching-cost point, not a waiting period) and is designed to
 distinguish seasonal from structural.
 
 ## OPEN DECISIONS — DO NOT RESOLVE PREMATURELY
@@ -234,7 +242,10 @@ them without new evidence:
   (no decision made; not in the synced files).
 - Whether Gorgias tagging is consistent enough across the
   target segment to make C1 (Sizing Complaint Velocity)
-  reliable.
+  reliable. Committed direction is to PARSE TICKET TEXT rather
+  than trust tags (product_strategy, 2026-06-04); the parser is
+  PENDING BUILD — the question stays open until it is built and
+  validated. (Open item tracked in the pilot readiness register.)
 - Whether founders will act on proactive alerts before
   seeing the problem themselves (the core hypothesis).
 - Product identity (pilot_scope.md §5, OPEN): whether PS is

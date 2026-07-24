@@ -145,8 +145,9 @@ Time between purchase and return initiation. Short lag (1–3 days) = expectatio
 
 ---
 
-## 3C. Natural Language Query (NLQ) — Pilot Launch Feature
-*Written May 2026. Required at pilot launch — not post-beta.*
+## 3C. Natural Language Query (NLQ) — Post-Pilot Feature
+*Written May 2026. RE-SCOPED 2026-07-24 to POST-PILOT — not a pilot-launch feature. Pilot day-one visibility is delivered by the connect-day email instead (see §5 and pilot_scope §2). Section preserved in full; the cold-start rationale below is the risk being accepted by moving it post-pilot.*
+*Note: only the query INTERFACE moves post-pilot. historical_pattern_scan.py remains PILOT scope (tracked as FC-6 in the pilot readiness register) — it runs at onboarding regardless.*
 
 ### What It Is
 A query interface over all connected source data. The founder types a question
@@ -160,7 +161,9 @@ Profit Sentinel has access to — nothing outside connected sources.
 "I can answer anything about your Shopify, Meta, TikTok, Klaviyo, Gorgias,
 GA4, and Sentry data. Anything outside those sources I can't see."
 
-### Why Pilot Launch, Not Post-Beta
+### Why It Was Originally Scoped for Pilot Launch
+This rationale is retained as the risk being accepted by moving the feature post-pilot; the connect-day email is the mitigation.
+
 Proactive alerts may take days to fire on a new account. Without NLQ, the
 product is invisible to the founder between onboarding and first alert. NLQ
 creates active utility from day one — founder can query their data immediately
@@ -1059,12 +1062,12 @@ grow your margin. We'll only reach out when something genuinely threatens your
 profitability — no noise, no dashboards.
 
 When an alert arrives, you'll see exactly what's happening, why, and what to do. Hit 
-Agree, Snooze, or Disagree — every tap teaches Profit Sentinel your business. The more 
+Agree, Snooze, or Disagree — every click teaches Profit Sentinel your business. The more 
 you respond, the sharper and more personalised your alerts become.
 
-You can also ask me anything about your business directly — "What was my best performing 
-SKU last month?" or "Why did my ROAS drop last week?" — I'll answer instantly from your 
-connected sources.
+The moment you connect, you'll get a first email from me — your blended post-return ROAS, your
+serial-offenders list, and a return-rate-and-reason table, all on your own numbers. After that,
+a weekly digest keeps the picture current. [Provisional copy — to be refined.]
 
 For patterns I haven't seen before in your data, I'll tell you what I see and flag that 
 I'm still learning the cause — I get sharper the longer I run.
@@ -1085,12 +1088,12 @@ margin. We'll only reach out when something genuinely threatens your profitabili
 no noise, no dashboards.
 
 When an alert arrives, you'll see exactly what's happening, why, and what to do. Hit 
-Agree, Snooze, or Disagree — every tap teaches Profit Sentinel your business. The more 
+Agree, Snooze, or Disagree — every click teaches Profit Sentinel your business. The more 
 you respond, the sharper and more personalised your alerts become.
 
-You can also ask me anything about your business directly — "What was my best performing 
-SKU last month?" or "Why did my ROAS drop last week?" — I'll answer instantly from your 
-connected sources.
+The moment you connect, you'll get a first email from me — your blended post-return ROAS, your
+serial-offenders list, and a return-rate-and-reason table, all on your own numbers. After that,
+a weekly digest keeps the picture current. [Provisional copy — to be refined.]
 
 For patterns I haven't seen before in your data, I'll tell you what I see and flag that 
 I'm still learning the cause — I get sharper the longer I run.
@@ -1101,7 +1104,7 @@ We're watching. You'll hear from us when it matters.
 **Implementation notes:**
 - Connector list in headline is dynamic — only shows connected sources
 - "Your first alert will fire" language only used if ≥1 chain is at provisional or core tier
-- "Why did my ROAS drop?" in NLQ example is accurate at pilot — Agent B handles causal reasoning
+- "Why did my ROAS drop?" NLQ example is POST-PILOT, not pilot — the query feature is re-scoped post-pilot (§3C); at pilot this is delivered as an alert, not a query. Agent B still handles the causal reasoning.
 - Causal NLQ questions for chains not yet in the 59 return: "I can see X happened but I don't yet have enough data to identify the cause — I'm tracking it"
 
 ---
