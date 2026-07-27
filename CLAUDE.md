@@ -270,3 +270,11 @@ raw tables (DEBT-006); the two layers above are the
 durable controls.
 
 ## FILE LOCATIONS (AUTHORITATIVE)
+
+- `sql/schema.sql` — point-in-time schema DDL snapshot of the
+  public + client_azure_co (non-Airbyte) tables, generated from
+  the Postgres catalog (information_schema + pg_catalog), NOT
+  pg_dump. A SNAPSHOT, not a migration file. Excludes triggers,
+  grants and comments — grants + RLS are owned by
+  `connectors/_harden_public_schema.py`. Regenerate after any
+  table or column change (RULE 9).
