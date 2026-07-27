@@ -1,0 +1,35 @@
+name: Supabase keep-alive
+
+# WHY: Supabase pauses free-tier projects after ~7 days without database
+# activity. A paused project is unreachable until manually restored from
+# the dashboard - there is no API or CLI to unpause it.
+#
+# Twice a week leaves margin if one run fails.
+# GitHub cron is ALWAYS UTC, never local time.
+
+on:
+  schedule:
+    - cron: '14 6 * * 2,5'    # Tuesdays and Fridays, 06:14 UTC
+  workflow_dispatch:           # lets you run it by hand
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgres client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Touch the database
+        env:
+          # MUST be the SESSION POOLER url:
+          #   postgresql://postgres.<ref>:<pw>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+          # NOT the direct url (db.<ref>.supabase.co) - that is IPv6-only
+          # and GitHub runners cannot reach it.
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::SUPABASE_DATABASE_URL secret is not set"
+            exit 1
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "select 'keepalive' as ping, count(*) as client_rows, now() from public.client_config;"
